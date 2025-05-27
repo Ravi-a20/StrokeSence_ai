@@ -19,7 +19,7 @@ const BalanceTest = () => {
   const [countdown, setCountdown] = useState(0);
   const [testProgress, setTestProgress] = useState(0);
   const [accelerometerData, setAccelerometerData] = useState<MotionData[]>([]);
-  const [gyroscopeData, setGyroscopeData] = useState<MotionData[]>([]);
+  const [orientationData, setOrientationData] = useState<MotionData[]>([]);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
@@ -40,39 +40,12 @@ const BalanceTest = () => {
     };
   }, [countdown, isTestActive]);
 
-  const requestPermissions = async () => {
-    try {
-      const hasPermission = await Motion.requestPermissions();
-      if (hasPermission.granted) {
-        return true;
-      } else {
-        toast({
-          title: "Permission Required",
-          description: "Motion sensor access is required for balance testing",
-          variant: "destructive",
-        });
-        return false;
-      }
-    } catch (error) {
-      console.error('Permission request failed:', error);
-      toast({
-        title: "Error",
-        description: "Failed to request motion sensor permissions",
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
-
   const startTest = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
-
     setIsTestActive(true);
     setCountdown(3);
     setTestProgress(0);
     setAccelerometerData([]);
-    setGyroscopeData([]);
+    setOrientationData([]);
     setTestResult(null);
     
     toast({
@@ -94,15 +67,15 @@ const BalanceTest = () => {
         setAccelerometerData(prev => [...prev, data]);
       });
 
-      // Start gyroscope
-      await Motion.addListener('gyro', (event) => {
+      // Start orientation tracking (includes rotation data)
+      await Motion.addListener('orientation', (event) => {
         const data: MotionData = {
-          x: event.rotationRate.alpha,
-          y: event.rotationRate.beta,
-          z: event.rotationRate.gamma,
+          x: event.alpha || 0, // rotation around z-axis
+          y: event.beta || 0,  // rotation around x-axis
+          z: event.gamma || 0, // rotation around y-axis
           timestamp: Date.now()
         };
-        setGyroscopeData(prev => [...prev, data]);
+        setOrientationData(prev => [...prev, data]);
       });
 
       toast({
@@ -161,7 +134,7 @@ const BalanceTest = () => {
 
       // Convert motion data to the format expected by API
       const accelArray = accelerometerData.map(d => [d.x, d.y, d.z]);
-      const gyroArray = gyroscopeData.map(d => [d.x, d.y, d.z]);
+      const gyroArray = orientationData.map(d => [d.x, d.y, d.z]); // Using orientation data as gyro substitute
 
       const sensorData: SensorData = {
         accel: accelArray,
