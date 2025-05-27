@@ -1,15 +1,13 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
-import { UserOut } from '../services/apiService';
+import { authService, AuthUser } from '../services/authService';
 import { Brain, Activity, Mic, Shield, User, LogOut } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
-  const [user, setUser] = useState<UserOut | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 

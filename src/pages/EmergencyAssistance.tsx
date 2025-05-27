@@ -3,13 +3,13 @@ import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
-import { apiService, UserOut } from '../services/apiService';
+import { authService, AuthUser } from '../services/authService';
+import { apiService } from '../services/apiService';
 import { ArrowLeft, Brain, Phone, AlertTriangle, Users } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const EmergencyAssistance = () => {
-  const [user, setUser] = useState<UserOut | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [assistanceData, setAssistanceData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();

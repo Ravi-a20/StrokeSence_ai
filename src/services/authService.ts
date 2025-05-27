@@ -6,6 +6,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: string;
+  created_at: string;
   emergency_contacts: Array<{
     name: string;
     relation: string;
@@ -32,6 +33,7 @@ class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        created_at: user.created_at,
         emergency_contacts: user.emergency_contacts
       };
       
@@ -53,6 +55,7 @@ class AuthService {
         name: response.name,
         email: response.email,
         role: response.role,
+        created_at: response.created_at || new Date().toISOString(),
         emergency_contacts: response.emergency_contacts || []
       };
       
@@ -72,6 +75,19 @@ class AuthService {
 
   getCurrentUser(): AuthUser | null {
     return this.currentUser;
+  }
+
+  setCurrentUser(user: UserOut): void {
+    const authUser: AuthUser = {
+      _id: user._id!,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      created_at: user.created_at,
+      emergency_contacts: user.emergency_contacts
+    };
+    this.currentUser = authUser;
+    localStorage.setItem('currentUser', JSON.stringify(authUser));
   }
 
   isAuthenticated(): boolean {
@@ -95,6 +111,7 @@ class AuthService {
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
+        created_at: updatedUser.created_at,
         emergency_contacts: updatedUser.emergency_contacts
       };
       

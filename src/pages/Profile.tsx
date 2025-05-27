@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
-import { apiService, UserOut, UserUpdate, EmergencyContact } from '../services/apiService';
+import { authService, AuthUser } from '../services/authService';
+import { apiService, UserUpdate, EmergencyContact } from '../services/apiService';
 import { ArrowLeft, Brain, Plus, Trash2, Save } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const Profile = () => {
-  const [user, setUser] = useState<UserOut | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<UserUpdate>({
@@ -71,7 +71,14 @@ const Profile = () => {
     setIsLoading(true);
     try {
       const updatedUser = await apiService.updateUser(user._id!, formData);
-      setUser(updatedUser);
+      setUser({
+        _id: updatedUser._id!,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        created_at: updatedUser.created_at,
+        emergency_contacts: updatedUser.emergency_contacts
+      });
       setIsEditing(false);
       
       // Update localStorage
