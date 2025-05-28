@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import BalanceTestPage from "./pages/BalanceTestPage";
 import SpeechTestPage from "./pages/SpeechTestPage";
+import EyeTrackingTestPage from "./pages/EyeTrackingTestPage";
 import EmergencyAssistance from "./pages/EmergencyAssistance";
 import NotFound from "./pages/NotFound";
 
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/profile" element={<Profile />} />
           <Route path="/balance-test" element={<BalanceTestPage />} />
           <Route path="/speech-test" element={<SpeechTestPage />} />
+          <Route path="/eye-tracking-test" element={<EyeTrackingTestPage />} />
           <Route path="/emergency" element={<EmergencyAssistance />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
