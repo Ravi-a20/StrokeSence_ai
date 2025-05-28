@@ -1,5 +1,6 @@
 
 import { apiService, UserCreate, UserLogin, UserOut } from './apiService';
+import { DEV_MODE } from '@/config/devMode';
 
 export interface AuthUser {
   _id: string;
@@ -23,9 +24,23 @@ class AuthService {
     if (savedUser) {
       this.currentUser = JSON.parse(savedUser);
     }
+    
+    // If dev mode is enabled and no user is saved, use mock user
+    if (DEV_MODE.enabled && DEV_MODE.bypassAuth && !this.currentUser) {
+      this.currentUser = DEV_MODE.mockUser;
+      localStorage.setItem('currentUser', JSON.stringify(DEV_MODE.mockUser));
+    }
   }
 
   async signup(userData: UserCreate): Promise<AuthUser> {
+    // In dev mode with auth bypass, return mock user
+    if (DEV_MODE.enabled && DEV_MODE.bypassAuth) {
+      const mockUser = { ...DEV_MODE.mockUser, ...userData };
+      this.currentUser = mockUser;
+      localStorage.setItem('currentUser', JSON.stringify(mockUser));
+      return mockUser;
+    }
+
     try {
       const user = await apiService.signup(userData);
       const authUser: AuthUser = {
@@ -47,6 +62,14 @@ class AuthService {
   }
 
   async login(credentials: UserLogin): Promise<AuthUser> {
+    // In dev mode with auth bypass, return mock user
+    if (DEV_MODE.enabled && DEV_MODE.bypassAuth) {
+      const mockUser = { ...DEV_MODE.mockUser, email: credentials.email };
+      this.currentUser = mockUser;
+      localStorage.setItem('currentUser', JSON.stringify(mockUser));
+      return mockUser;
+    }
+
     try {
       const response = await apiService.login(credentials);
       // Assuming the login response contains user data
