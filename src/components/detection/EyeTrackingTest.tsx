@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 interface EyeTrackingTestProps {
   onComplete: (result: any) => void;
@@ -15,14 +15,20 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
   const [currentDirection, setCurrentDirection] = useState('');
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [matchedDirections, setMatchedDirections] = useState<Set<string>>(new Set());
   const [permissionGranted, setPermissionGranted] = useState(false);
+  
+  // New state for improved test logic
+  const [missedDirections, setMissedDirections] = useState<string[]>([]);
+  const [consecutiveMisses, setConsecutiveMisses] = useState(0);
+  const [completedDirections, setCompletedDirections] = useState<string[]>([]);
+  const [testHistory, setTestHistory] = useState<Array<{direction: string, result: 'success' | 'miss'}>>([]);
   
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // All 8 possible gaze directions based on your model
+  // All 8 possible gaze directions
   const directions = ["Left", "Right", "Up", "Down", "Up-Left", "Up-Right", "Down-Left", "Down-Right"];
   const [directionsToTest, setDirectionsToTest] = useState<string[]>([]);
   const [currentDirectionIndex, setCurrentDirectionIndex] = useState(0);
@@ -32,6 +38,9 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
       }
     };
   }, []);
@@ -63,87 +72,175 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
 
     setIsTestRunning(true);
     setTestResult(null);
-    setMatchedDirections(new Set());
+    setMissedDirections([]);
+    setConsecutiveMisses(0);
+    setCompletedDirections([]);
+    setTestHistory([]);
     
-    // Randomize directions like in your Python model
+    // Randomize directions
     const shuffledDirections = [...directions].sort(() => Math.random() - 0.5);
     setDirectionsToTest(shuffledDirections);
     setCurrentDirectionIndex(0);
     setCurrentDirection(shuffledDirections[0]);
-    setTimeRemaining(3); // 3 seconds per direction
-
+    
     toast({
       title: "Eye Tracking Test Started",
       description: "Follow the instructions and look in the indicated directions",
     });
 
-    // Start the direction timer
+    // Announce direction with text-to-speech
+    speakDirection(shuffledDirections[0]);
+    
+    // Start the 5-second timer for this direction
     startDirectionTimer();
   };
 
+  const speakDirection = (direction: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(`Look ${direction}`);
+      utterance.rate = 0.8;
+      utterance.volume = 0.7;
+      speechSynthesis.speak(utterance);
+    }
+  };
+
   const startDirectionTimer = () => {
-    const timer = setInterval(() => {
+    setTimeRemaining(5); // 5 seconds per direction
+    
+    const countdown = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
-          // Move to next direction or complete test
-          const nextIndex = currentDirectionIndex + 1;
-          if (nextIndex < directionsToTest.length) {
-            setCurrentDirectionIndex(nextIndex);
-            setCurrentDirection(directionsToTest[nextIndex]);
-            return 3; // Reset timer for next direction
-          } else {
-            // Test completed
-            completeTest();
-            clearInterval(timer);
-            return 0;
-          }
+          clearInterval(countdown);
+          // Time's up - mark as miss
+          handleDirectionMiss();
+          return 0;
         }
         return prev - 1;
       });
     }, 1000);
+    
+    timerRef.current = countdown;
   };
 
-  const completeTest = () => {
+  const handleDirectionSuccess = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    const currentDir = directionsToTest[currentDirectionIndex];
+    setCompletedDirections(prev => [...prev, currentDir]);
+    setTestHistory(prev => [...prev, { direction: currentDir, result: 'success' }]);
+    setConsecutiveMisses(0); // Reset consecutive misses
+
+    toast({
+      title: "Direction Matched!",
+      description: `Successfully detected gaze direction: ${currentDir}`,
+    });
+
+    // Move to next direction or complete test
+    const nextIndex = currentDirectionIndex + 1;
+    if (nextIndex < directionsToTest.length) {
+      setCurrentDirectionIndex(nextIndex);
+      setCurrentDirection(directionsToTest[nextIndex]);
+      speakDirection(directionsToTest[nextIndex]);
+      startDirectionTimer();
+    } else {
+      completeTest('all_completed');
+    }
+  };
+
+  const handleDirectionMiss = () => {
+    const currentDir = directionsToTest[currentDirectionIndex];
+    setMissedDirections(prev => [...prev, currentDir]);
+    setTestHistory(prev => [...prev, { direction: currentDir, result: 'miss' }]);
+    
+    const newConsecutiveMisses = consecutiveMisses + 1;
+    setConsecutiveMisses(newConsecutiveMisses);
+
+    toast({
+      title: "Direction Missed",
+      description: `Failed to detect gaze direction: ${currentDir}`,
+      variant: "destructive",
+    });
+
+    // Check for 2 consecutive misses
+    if (newConsecutiveMisses >= 2) {
+      completeTest('abnormal_detected');
+      return;
+    }
+
+    // Move to next direction
+    const nextIndex = currentDirectionIndex + 1;
+    if (nextIndex < directionsToTest.length) {
+      setCurrentDirectionIndex(nextIndex);
+      setCurrentDirection(directionsToTest[nextIndex]);
+      speakDirection(directionsToTest[nextIndex]);
+      startDirectionTimer();
+    } else {
+      completeTest('completed_with_misses');
+    }
+  };
+
+  const completeTest = (reason: 'all_completed' | 'abnormal_detected' | 'completed_with_misses') => {
     setIsTestRunning(false);
     
-    // Analyze results based on your model logic
-    const correctCount = matchedDirections.size;
-    const result = correctCount === 8 ? 'normal' : 'abnormal';
-    const resultText = correctCount === 8 
-      ? "No abnormalities detected - All directions matched correctly"
-      : `Potential abnormalities detected - Matched ${correctCount}/8 directions`;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    let result: string;
+    let resultText: string;
+    let score: number;
+
+    if (reason === 'abnormal_detected') {
+      result = 'abnormal';
+      resultText = "Abnormal Eye Movement Detected – Possible Stroke Symptoms";
+      score = 0;
+    } else {
+      // Check if there were any successful matches
+      const hasSuccessfulMatches = completedDirections.length > 0;
+      if (hasSuccessfulMatches) {
+        result = 'normal';
+        resultText = "No Abnormality Detected";
+        score = Math.round((completedDirections.length / directionsToTest.length) * 100);
+      } else {
+        result = 'abnormal';
+        resultText = "No successful eye movements detected";
+        score = 0;
+      }
+    }
 
     setTestResult(result);
 
-    const testResult = {
+    const testResultData = {
       type: 'eyeTracking',
       result,
-      score: Math.round((correctCount / 8) * 100),
+      score,
       details: resultText,
       rawData: {
-        matchedDirections: Array.from(matchedDirections),
-        totalDirections: 8,
+        completedDirections,
+        missedDirections,
+        consecutiveMisses,
+        testHistory,
+        totalDirections: directionsToTest.length,
+        reason
       },
       timestamp: new Date().toISOString(),
     };
 
-    onComplete(testResult);
+    onComplete(testResultData);
 
     toast({
       title: "Test Complete",
       description: resultText,
+      variant: result === 'normal' ? 'default' : 'destructive',
     });
   };
 
-  const simulateGazeDetection = () => {
-    // Simulate eye tracking detection (in real implementation, this would use computer vision)
-    const detectionAccuracy = 0.8; // 80% accuracy simulation
-    if (Math.random() < detectionAccuracy) {
-      setMatchedDirections(prev => new Set([...prev, currentDirection]));
-      toast({
-        title: "Direction Matched",
-        description: `Successfully detected gaze direction: ${currentDirection}`,
-      });
+  const stopTest = () => {
+    setIsTestRunning(false);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
     }
   };
 
@@ -191,30 +288,41 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
                   {currentDirection}
                 </div>
                 <p className="text-gray-600">Look in this direction</p>
-                <div className="text-2xl font-bold text-gray-800 mt-2">
-                  {timeRemaining}s
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <Clock className="h-5 w-5 text-gray-600" />
+                  <span className="text-2xl font-bold text-gray-800">
+                    {timeRemaining}s
+                  </span>
                 </div>
               </div>
               
               <Progress value={progress} className="w-full" />
               
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-blue-800 text-center">
-                  Progress: {matchedDirections.size}/8 directions detected
-                </p>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-green-800 font-medium">Completed: {completedDirections.length}</p>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-red-800 font-medium">Missed: {missedDirections.length}</p>
+                </div>
               </div>
 
-              <Button onClick={simulateGazeDetection} className="w-full">
-                Simulate Gaze Detection (for testing)
-              </Button>
-              
-              <Button 
-                onClick={() => setIsTestRunning(false)} 
-                variant="destructive" 
-                className="w-full"
-              >
-                Stop Test
-              </Button>
+              {consecutiveMisses > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-orange-800 text-sm">
+                    Consecutive misses: {consecutiveMisses}/2
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button onClick={handleDirectionSuccess} className="flex-1">
+                  Simulate Success
+                </Button>
+                <Button onClick={stopTest} variant="destructive" className="flex-1">
+                  Stop Test
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -244,9 +352,9 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
                 <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
                   <li>Position your face within the green rectangle</li>
                   <li>Look directly at the camera to start</li>
-                  <li>When a direction appears, look in that direction</li>
-                  <li>Hold your gaze for the full duration</li>
-                  <li>The test will automatically progress through 8 directions</li>
+                  <li>When a direction appears, look in that direction within 5 seconds</li>
+                  <li>The test will stop early if 2 consecutive directions are missed</li>
+                  <li>Audio instructions will guide you through each direction</li>
                 </ol>
               </div>
               
