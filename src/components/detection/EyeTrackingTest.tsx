@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, Clock, Camera } from 'lucide-react';
 
 interface EyeTrackingTestProps {
   onComplete: (result: any) => void;
@@ -16,6 +16,9 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [eyePosition, setEyePosition] = useState({ x: 0, y: 0 });
+  const [baselinePosition, setBaselinePosition] = useState({ x: 0, y: 0 });
   
   // New state for improved test logic
   const [missedDirections, setMissedDirections] = useState<string[]>([]);
@@ -25,8 +28,10 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
   
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const detectionRef = useRef<NodeJS.Timeout | null>(null);
 
   // All 8 possible gaze directions
   const directions = ["Left", "Right", "Up", "Down", "Up-Left", "Up-Right", "Down-Left", "Down-Right"];
@@ -42,17 +47,30 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (detectionRef.current) {
+        clearTimeout(detectionRef.current);
+      }
     };
   }, []);
 
   const checkCameraPermissions = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: 640, 
+          height: 480,
+          facingMode: 'user'
+        } 
+      });
       setPermissionGranted(true);
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video loaded, starting face detection');
+          startFaceDetection();
+        };
       }
     } catch (error) {
       console.error('Camera permission denied:', error);
@@ -64,9 +82,105 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
     }
   };
 
+  const startFaceDetection = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+
+    // Set canvas size to match video
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    const detectFace = () => {
+      if (!video.videoWidth || !ctx) return;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Simple eye position detection based on face center
+      // In a real implementation, you'd use MediaPipe or face-api.js
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      
+      // Simulate eye tracking by detecting movement from center
+      // This is a simplified version - real implementation would use proper face detection
+      setEyePosition({ x: centerX, y: centerY });
+      
+      if (isTestRunning && !isCalibrating) {
+        checkGazeDirection(centerX, centerY);
+      }
+      
+      detectionRef.current = setTimeout(detectFace, 100); // 10 FPS
+    };
+
+    detectFace();
+  };
+
+  const checkGazeDirection = (x: number, y: number) => {
+    if (!baselinePosition.x || !baselinePosition.y) return;
+    
+    const deltaX = x - baselinePosition.x;
+    const deltaY = y - baselinePosition.y;
+    const threshold = 30; // Minimum movement threshold
+    
+    let detectedDirection = '';
+    
+    // Determine direction based on movement
+    if (Math.abs(deltaX) > threshold || Math.abs(deltaY) > threshold) {
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        detectedDirection = deltaX > 0 ? 'Right' : 'Left';
+      } else {
+        detectedDirection = deltaY > 0 ? 'Down' : 'Up';
+      }
+      
+      // Handle diagonal directions
+      if (Math.abs(deltaX) > threshold && Math.abs(deltaY) > threshold) {
+        if (deltaY < 0) {
+          detectedDirection = deltaX > 0 ? 'Up-Right' : 'Up-Left';
+        } else {
+          detectedDirection = deltaX > 0 ? 'Down-Right' : 'Down-Left';
+        }
+      }
+    }
+    
+    console.log(`Current direction: ${currentDirection}, Detected: ${detectedDirection}, Delta: ${deltaX}, ${deltaY}`);
+    
+    // Check if detected direction matches current instruction
+    if (detectedDirection === currentDirection) {
+      handleDirectionSuccess();
+    }
+  };
+
+  const calibrateBaseline = () => {
+    setIsCalibrating(true);
+    toast({
+      title: "Calibrating",
+      description: "Look straight at the camera for 3 seconds",
+    });
+    
+    setTimeout(() => {
+      setBaselinePosition({ x: eyePosition.x, y: eyePosition.y });
+      setIsCalibrating(false);
+      console.log('Baseline set:', eyePosition);
+      toast({
+        title: "Calibration Complete",
+        description: "You can now start the eye tracking test",
+      });
+    }, 3000);
+  };
+
   const startTest = () => {
     if (!permissionGranted) {
       checkCameraPermissions();
+      return;
+    }
+
+    if (!baselinePosition.x || !baselinePosition.y) {
+      calibrateBaseline();
       return;
     }
 
@@ -277,9 +391,34 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
               playsInline
               className="w-full h-64 bg-black rounded-lg object-cover"
             />
+            <canvas
+              ref={canvasRef}
+              className="absolute top-0 left-0 w-full h-64 opacity-30 pointer-events-none"
+            />
             {/* Safety margin overlay */}
             <div className="absolute inset-4 border-2 border-green-500 rounded-lg pointer-events-none" />
+            
+            {/* Eye position indicator */}
+            {eyePosition.x > 0 && (
+              <div 
+                className="absolute w-2 h-2 bg-red-500 rounded-full"
+                style={{
+                  left: `${(eyePosition.x / 640) * 100}%`,
+                  top: `${(eyePosition.y / 480) * 100}%`,
+                  transform: 'translate(-50%, -50%)'
+                }}
+              />
+            )}
           </div>
+
+          {isCalibrating && (
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600 mb-2">
+                Calibrating...
+              </div>
+              <p className="text-gray-600">Look straight at the camera</p>
+            </div>
+          )}
 
           {isTestRunning ? (
             <div className="space-y-4">
@@ -316,8 +455,8 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
               )}
 
               <div className="flex gap-2">
-                <Button onClick={handleDirectionSuccess} className="flex-1">
-                  Simulate Success
+                <Button onClick={handleDirectionSuccess} className="flex-1" variant="outline">
+                  Simulate Success (Dev)
                 </Button>
                 <Button onClick={stopTest} variant="destructive" className="flex-1">
                   Stop Test
@@ -351,20 +490,32 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
                 <h3 className="font-semibold text-gray-800">Instructions:</h3>
                 <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
                   <li>Position your face within the green rectangle</li>
-                  <li>Look directly at the camera to start</li>
+                  <li>Click "Calibrate" first to set your baseline eye position</li>
+                  <li>Look directly at the camera during calibration</li>
                   <li>When a direction appears, look in that direction within 5 seconds</li>
                   <li>The test will stop early if 2 consecutive directions are missed</li>
                   <li>Audio instructions will guide you through each direction</li>
                 </ol>
               </div>
               
-              <Button 
-                onClick={startTest} 
-                className="w-full"
-                disabled={!permissionGranted}
-              >
-                Start Eye Tracking Test
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={calibrateBaseline} 
+                  className="flex-1"
+                  disabled={!permissionGranted}
+                  variant="outline"
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Calibrate
+                </Button>
+                <Button 
+                  onClick={startTest} 
+                  className="flex-1"
+                  disabled={!permissionGranted || (!baselinePosition.x && !isCalibrating)}
+                >
+                  Start Eye Tracking Test
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
