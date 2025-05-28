@@ -1,9 +1,16 @@
 
 import { Camera } from '@capacitor/camera';
-import { Microphone } from '@capacitor/voice-recorder';
 import { Filesystem } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import { toast } from '@/hooks/use-toast';
+
+// Import voice recorder with proper error handling
+let VoiceRecorder: any;
+try {
+  VoiceRecorder = require('@capacitor/voice-recorder').VoiceRecorder;
+} catch (error) {
+  console.log('Voice recorder not available:', error);
+}
 
 export interface PermissionStatus {
   camera: boolean;
@@ -67,8 +74,10 @@ class PermissionsService {
 
     try {
       // Request microphone permission
-      const micPermission = await Microphone.requestPermissions();
-      permissions.microphone = micPermission.microphone === 'granted';
+      if (VoiceRecorder) {
+        const micPermission = await VoiceRecorder.requestPermissions();
+        permissions.microphone = micPermission.microphone === 'granted';
+      }
     } catch (error) {
       console.log('Microphone permission request failed:', error);
     }
@@ -116,8 +125,10 @@ class PermissionsService {
     }
 
     try {
-      const micPermission = await Microphone.checkPermissions();
-      permissions.microphone = micPermission.microphone === 'granted';
+      if (VoiceRecorder) {
+        const micPermission = await VoiceRecorder.checkPermissions();
+        permissions.microphone = micPermission.microphone === 'granted';
+      }
     } catch (error) {
       console.log('Microphone permission check failed:', error);
     }
