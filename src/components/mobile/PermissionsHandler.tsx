@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Camera, Mic, HardDrive, CheckCircle, XCircle, Settings } from 'lucide-react';
+import { Camera, Mic, HardDrive, Activity, CheckCircle, XCircle, Settings } from 'lucide-react';
 import { permissionsService, PermissionStatus } from '@/services/permissionsService';
 import { Capacitor } from '@capacitor/core';
 
@@ -15,7 +15,8 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
   const [permissions, setPermissions] = useState<PermissionStatus>({
     camera: false,
     microphone: false,
-    storage: false
+    storage: false,
+    motion: false
   });
   const [isChecking, setIsChecking] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
@@ -35,7 +36,7 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
     setPermissions(currentPermissions);
     
     // If all permissions are granted, proceed
-    if (currentPermissions.camera && currentPermissions.microphone && currentPermissions.storage) {
+    if (currentPermissions.camera && currentPermissions.microphone && currentPermissions.storage && currentPermissions.motion) {
       onPermissionsGranted();
     } else {
       setShowPermissions(true);
@@ -68,7 +69,7 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
     return null;
   }
 
-  const allPermissionsGranted = permissions.camera && permissions.microphone && permissions.storage;
+  const allPermissionsGranted = permissions.camera && permissions.microphone && permissions.storage && permissions.motion;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
@@ -120,6 +121,21 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
                 </div>
               </div>
               {permissions.storage ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600" />
+              )}
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <Activity className="h-5 w-5 text-orange-600" />
+                <div>
+                  <p className="font-medium">Motion Sensors</p>
+                  <p className="text-sm text-gray-600">For balance testing</p>
+                </div>
+              </div>
+              {permissions.motion ? (
                 <CheckCircle className="h-5 w-5 text-green-600" />
               ) : (
                 <XCircle className="h-5 w-5 text-red-600" />

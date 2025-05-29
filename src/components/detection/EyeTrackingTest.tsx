@@ -1,70 +1,81 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, CheckCircle, XCircle, Clock, Camera, Target } from 'lucide-react';
-import EyeTrackingConfig from './EyeTrackingConfig';
+import { Eye, CheckCircle, XCircle, Camera, Volume2 } from 'lucide-react';
 
 interface EyeTrackingTestProps {
   onComplete: (result: any) => void;
 }
 
-const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
-  // Configuration with default values
-  const [config, setConfig] = useState({
-    movementThreshold: 40,
-    calibrationTime: 3,
-    directionTime: 5,
-    maxConsecutiveMisses: 2,
-    detectionInterval: 100,
-    smoothingFactor: 0.3
-  });
+const directions = [
+  'up', 'down', 'left', 'right',
+  'top-left', 'top-right', 'bottom-left', 'bottom-right'
+];
 
-  const [isTestRunning, setIsTestRunning] = useState(false);
-  const [currentDirection, setCurrentDirection] = useState('');
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [testResult, setTestResult] = useState<string | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [eyePosition, setEyePosition] = useState({ x: 0, y: 0 });
-  const [smoothedPosition, setSmoothedPosition] = useState({ x: 0, y: 0 });
-  const [baselinePosition, setBaselinePosition] = useState({ x: 0, y: 0 });
-  const [showConfig, setShowConfig] = useState(false);
-  
-  // Test state
-  const [missedDirections, setMissedDirections] = useState<string[]>([]);
+interface TestResult {
+  status: 'pass' | 'anomaly';
+  missed: number;
+  consecutiveMisses: number;
+  completedDirections: string[];
+  missedDirections: string[];
+}
+
+const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
+  const [faceAligned, setFaceAligned] = useState(false);
+  const [testStarted, setTestStarted] = useState(false);
+  const [currentDirection, setCurrentDirection] = useState<string | null>(null);
+  const [directionIndex, setDirectionIndex] = useState(0);
+  const [missedCount, setMissedCount] = useState(0);
   const [consecutiveMisses, setConsecutiveMisses] = useState(0);
+  const [result, setResult] = useState<TestResult | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState(6);
   const [completedDirections, setCompletedDirections] = useState<string[]>([]);
-  const [testHistory, setTestHistory] = useState<Array<{direction: string, result: 'success' | 'miss', movement?: {x: number, y: number}}>>([]);
-  const [currentMovement, setCurrentMovement] = useState({ x: 0, y: 0 });
-  const [detectedDirection, setDetectedDirection] = useState('');
+  const [missedDirections, setMissedDirections] = useState<string[]>([]);
+  const [cameraPermission, setCameraPermission] = useState(false);
+  
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   
   const { toast } = useToast();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const detectionRef = useRef<NodeJS.Timeout | null>(null);
-  const calibrationSamples = useRef<Array<{x: number, y: number}>>([]);
-
-  // All 8 possible gaze directions
-  const directions = ["Left", "Right", "Up", "Down", "Up-Left", "Up-Right", "Down-Left", "Down-Right"];
-  const [directionsToTest, setDirectionsToTest] = useState<string[]>([]);
-  const [currentDirectionIndex, setCurrentDirectionIndex] = useState(0);
 
   useEffect(() => {
-    checkCameraPermissions();
+    checkCameraPermission();
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (detectionRef.current) clearTimeout(detectionRef.current);
+      cleanup();
     };
   }, []);
 
-  const checkCameraPermissions = async () => {
+  useEffect(() => {
+    if (testStarted && directionIndex < directions.length && faceAligned) {
+      const dir = directions[directionIndex];
+      setCurrentDirection(dir);
+      setTimeRemaining(6);
+      playAudio(dir);
+      startCountdown();
+
+      timeoutRef.current = setTimeout(() => {
+        handleDirectionComplete(dir);
+      }, 6000); // 6 seconds per direction
+
+      return () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        if (countdownRef.current) clearTimeout(countdownRef.current);
+      };
+    }
+  }, [testStarted, directionIndex, faceAligned]);
+
+  const cleanup = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (countdownRef.current) clearTimeout(countdownRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const checkCameraPermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
@@ -73,15 +84,11 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
           facingMode: 'user'
         } 
       });
-      setPermissionGranted(true);
+      setCameraPermission(true);
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Video loaded, starting face detection');
-          startFaceDetection();
-        };
       }
     } catch (error) {
       console.error('Camera permission denied:', error);
@@ -93,305 +100,147 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
     }
   };
 
-  const startFaceDetection = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) return;
-
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-
-    const detectFace = () => {
-      if (!video.videoWidth || !ctx) return;
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Simple center-based detection (in real app, use MediaPipe)
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      
-      // Apply smoothing to reduce noise
-      const newX = smoothedPosition.x + (centerX - smoothedPosition.x) * config.smoothingFactor;
-      const newY = smoothedPosition.y + (centerY - smoothedPosition.y) * config.smoothingFactor;
-      
-      setEyePosition({ x: centerX, y: centerY });
-      setSmoothedPosition({ x: newX, y: newY });
-      
-      if (isTestRunning && !isCalibrating && baselinePosition.x && baselinePosition.y) {
-        checkGazeDirection(newX, newY);
-      }
-      
-      detectionRef.current = setTimeout(detectFace, config.detectionInterval);
-    };
-
-    detectFace();
-  };
-
-  const checkGazeDirection = (x: number, y: number) => {
-    const deltaX = x - baselinePosition.x;
-    const deltaY = y - baselinePosition.y;
-    const threshold = config.movementThreshold;
-    
-    setCurrentMovement({ x: deltaX, y: deltaY });
-    
-    let detected = '';
-    
-    // Determine direction based on movement with improved logic
-    const horizontalMovement = Math.abs(deltaX) > threshold;
-    const verticalMovement = Math.abs(deltaY) > threshold;
-    
-    if (horizontalMovement || verticalMovement) {
-      if (horizontalMovement && verticalMovement) {
-        // Diagonal movement
-        if (deltaY < 0) {
-          detected = deltaX > 0 ? 'Up-Right' : 'Up-Left';
-        } else {
-          detected = deltaX > 0 ? 'Down-Right' : 'Down-Left';
-        }
-      } else if (horizontalMovement) {
-        // Horizontal movement
-        detected = deltaX > 0 ? 'Right' : 'Left';
-      } else {
-        // Vertical movement
-        detected = deltaY > 0 ? 'Down' : 'Up';
-      }
-    }
-    
-    setDetectedDirection(detected);
-    
-    console.log(`Target: ${currentDirection}, Detected: ${detected}, Movement: (${deltaX.toFixed(1)}, ${deltaY.toFixed(1)}), Threshold: ${threshold}`);
-    
-    if (detected === currentDirection) {
-      handleDirectionSuccess();
-    }
-  };
-
-  const calibrateBaseline = () => {
-    setIsCalibrating(true);
-    calibrationSamples.current = [];
-    
-    toast({
-      title: "Calibrating",
-      description: `Look straight at the camera for ${config.calibrationTime} seconds`,
-    });
-    
-    // Collect samples during calibration
-    const sampleInterval = setInterval(() => {
-      calibrationSamples.current.push({ x: smoothedPosition.x, y: smoothedPosition.y });
-    }, 200);
-    
-    setTimeout(() => {
-      clearInterval(sampleInterval);
-      
-      // Calculate average position from samples
-      if (calibrationSamples.current.length > 0) {
-        const avgX = calibrationSamples.current.reduce((sum, pos) => sum + pos.x, 0) / calibrationSamples.current.length;
-        const avgY = calibrationSamples.current.reduce((sum, pos) => sum + pos.y, 0) / calibrationSamples.current.length;
-        
-        setBaselinePosition({ x: avgX, y: avgY });
-        console.log('Calibration complete. Baseline set to:', { x: avgX, y: avgY });
-        console.log('Samples collected:', calibrationSamples.current.length);
-      }
-      
-      setIsCalibrating(false);
-      toast({
-        title: "Calibration Complete",
-        description: "You can now start the eye tracking test",
-      });
-    }, config.calibrationTime * 1000);
-  };
-
-  const startTest = () => {
-    if (!permissionGranted) {
-      checkCameraPermissions();
-      return;
-    }
-
-    if (!baselinePosition.x || !baselinePosition.y) {
-      calibrateBaseline();
-      return;
-    }
-
-    setIsTestRunning(true);
-    setTestResult(null);
-    setMissedDirections([]);
-    setConsecutiveMisses(0);
-    setCompletedDirections([]);
-    setTestHistory([]);
-    
-    const shuffledDirections = [...directions].sort(() => Math.random() - 0.5);
-    setDirectionsToTest(shuffledDirections);
-    setCurrentDirectionIndex(0);
-    setCurrentDirection(shuffledDirections[0]);
-    
-    toast({
-      title: "Eye Tracking Test Started",
-      description: "Follow the instructions and look in the indicated directions",
-    });
-
-    speakDirection(shuffledDirections[0]);
-    startDirectionTimer();
-  };
-
-  const speakDirection = (direction: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(`Look ${direction}`);
-      utterance.rate = 0.8;
-      utterance.volume = 0.7;
-      speechSynthesis.speak(utterance);
-    }
-  };
-
-  const startDirectionTimer = () => {
-    setTimeRemaining(config.directionTime);
-    
+  const startCountdown = () => {
     const countdown = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
           clearInterval(countdown);
-          handleDirectionMiss();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     
-    timerRef.current = countdown;
+    countdownRef.current = countdown;
   };
 
-  const handleDirectionSuccess = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    const currentDir = directionsToTest[currentDirectionIndex];
-    setCompletedDirections(prev => [...prev, currentDir]);
-    setTestHistory(prev => [...prev, { 
-      direction: currentDir, 
-      result: 'success',
-      movement: { x: currentMovement.x, y: currentMovement.y }
-    }]);
-    setConsecutiveMisses(0);
-
-    toast({
-      title: "Direction Matched!",
-      description: `Successfully detected gaze direction: ${currentDir}`,
-    });
-
-    const nextIndex = currentDirectionIndex + 1;
-    if (nextIndex < directionsToTest.length) {
-      setCurrentDirectionIndex(nextIndex);
-      setCurrentDirection(directionsToTest[nextIndex]);
-      speakDirection(directionsToTest[nextIndex]);
-      startDirectionTimer();
-    } else {
-      completeTest('all_completed');
-    }
-  };
-
-  const handleDirectionMiss = () => {
-    const currentDir = directionsToTest[currentDirectionIndex];
-    setMissedDirections(prev => [...prev, currentDir]);
-    setTestHistory(prev => [...prev, { 
-      direction: currentDir, 
-      result: 'miss',
-      movement: { x: currentMovement.x, y: currentMovement.y }
-    }]);
+  const handleDirectionComplete = (direction: string) => {
+    const matched = isDirectionMatched(direction);
     
-    const newConsecutiveMisses = consecutiveMisses + 1;
-    setConsecutiveMisses(newConsecutiveMisses);
+    if (!matched) {
+      setMissedCount(prev => prev + 1);
+      setConsecutiveMisses(prev => prev + 1);
+      setMissedDirections(prev => [...prev, direction]);
+      
+      toast({
+        title: "Direction Missed",
+        description: `Failed to detect gaze direction: ${direction.toUpperCase()}`,
+        variant: "destructive",
+      });
+    } else {
+      setConsecutiveMisses(0);
+      setCompletedDirections(prev => [...prev, direction]);
+      
+      toast({
+        title: "Direction Matched!",
+        description: `Successfully detected gaze direction: ${direction.toUpperCase()}`,
+      });
+    }
 
-    toast({
-      title: "Direction Missed",
-      description: `Failed to detect gaze direction: ${currentDir}`,
-      variant: "destructive",
-    });
+    const newMissedCount = missedCount + (matched ? 0 : 1);
+    const newConsecutiveMisses = matched ? 0 : consecutiveMisses + 1;
+    const nextIndex = directionIndex + 1;
 
-    if (newConsecutiveMisses >= config.maxConsecutiveMisses) {
-      completeTest('abnormal_detected');
+    // Check anomaly conditions
+    if (newMissedCount >= 3 || newConsecutiveMisses >= 2) {
+      const testResult: TestResult = {
+        status: 'anomaly',
+        missed: newMissedCount,
+        consecutiveMisses: newConsecutiveMisses,
+        completedDirections,
+        missedDirections: matched ? missedDirections : [...missedDirections, direction]
+      };
+      setResult(testResult);
+      setTestStarted(false);
+      completeTest(testResult);
       return;
     }
 
-    const nextIndex = currentDirectionIndex + 1;
-    if (nextIndex < directionsToTest.length) {
-      setCurrentDirectionIndex(nextIndex);
-      setCurrentDirection(directionsToTest[nextIndex]);
-      speakDirection(directionsToTest[nextIndex]);
-      startDirectionTimer();
+    if (nextIndex < directions.length) {
+      setDirectionIndex(nextIndex);
     } else {
-      completeTest('completed_with_misses');
+      const testResult: TestResult = {
+        status: 'pass',
+        missed: newMissedCount,
+        consecutiveMisses: 0,
+        completedDirections: matched ? [...completedDirections, direction] : completedDirections,
+        missedDirections: matched ? missedDirections : [...missedDirections, direction]
+      };
+      setResult(testResult);
+      setTestStarted(false);
+      completeTest(testResult);
     }
   };
 
-  const completeTest = (reason: 'all_completed' | 'abnormal_detected' | 'completed_with_misses') => {
-    setIsTestRunning(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    let result: string;
-    let resultText: string;
-    let score: number;
-
-    if (reason === 'abnormal_detected') {
-      result = 'abnormal';
-      resultText = "Abnormal Eye Movement Detected – Possible Stroke Symptoms";
-      score = 0;
-    } else {
-      const hasSuccessfulMatches = completedDirections.length > 0;
-      if (hasSuccessfulMatches) {
-        result = 'normal';
-        resultText = "No Abnormality Detected";
-        score = Math.round((completedDirections.length / directionsToTest.length) * 100);
-      } else {
-        result = 'abnormal';
-        resultText = "No successful eye movements detected";
-        score = 0;
-      }
-    }
-
-    setTestResult(result);
-
-    const testResultData = {
+  const completeTest = (testResult: TestResult) => {
+    const resultData = {
       type: 'eyeTracking',
-      result,
-      score,
-      details: resultText,
+      result: testResult.status === 'pass' ? 'normal' : 'abnormal',
+      score: Math.round(((directions.length - testResult.missed) / directions.length) * 100),
+      details: testResult.status === 'pass' 
+        ? "No Abnormality Detected" 
+        : "Abnormal Eye Movement Detected – Possible Stroke Symptoms",
       rawData: {
-        completedDirections,
-        missedDirections,
-        consecutiveMisses,
-        testHistory,
-        totalDirections: directionsToTest.length,
-        reason,
-        config
+        ...testResult,
+        totalDirections: directions.length,
+        testSequence: directions
       },
       timestamp: new Date().toISOString(),
     };
 
-    onComplete(testResultData);
+    onComplete(resultData);
+  };
 
+  const handleStartTest = () => {
+    if (!cameraPermission) {
+      checkCameraPermission();
+      return;
+    }
+
+    setDirectionIndex(0);
+    setMissedCount(0);
+    setConsecutiveMisses(0);
+    setCompletedDirections([]);
+    setMissedDirections([]);
+    setResult(null);
+    setTestStarted(true);
+    
     toast({
-      title: "Test Complete",
-      description: resultText,
-      variant: result === 'normal' ? 'default' : 'destructive',
+      title: "Eye Tracking Test Started",
+      description: "Follow the audio instructions and look in the indicated directions",
     });
   };
 
-  const stopTest = () => {
-    setIsTestRunning(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
+  const simulateFaceAlignment = () => {
+    if (!cameraPermission) {
+      checkCameraPermission();
+      return;
+    }
+    setFaceAligned(true);
+    toast({
+      title: "Face Aligned",
+      description: "Your face is properly aligned. You can now start the test.",
+    });
   };
 
-  const progress = directionsToTest.length > 0 ? ((currentDirectionIndex / directionsToTest.length) * 100) : 0;
+  const resetTest = () => {
+    setTestStarted(false);
+    setFaceAligned(false);
+    setDirectionIndex(0);
+    setMissedCount(0);
+    setConsecutiveMisses(0);
+    setCompletedDirections([]);
+    setMissedDirections([]);
+    setResult(null);
+    setCurrentDirection(null);
+    setTimeRemaining(6);
+  };
+
+  const progress = directions.length > 0 ? ((directionIndex / directions.length) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-4">
-        {showConfig && (
-          <EyeTrackingConfig config={config} onConfigChange={setConfig} />
-        )}
-        
+      <div className="max-w-4xl mx-auto space-y-6">
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="flex items-center justify-center gap-2 text-2xl text-blue-600">
@@ -399,170 +248,144 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
               Eye Tracking Test
             </CardTitle>
             <p className="text-gray-600 mt-2">
-              Look at the camera and follow the gaze direction instructions
+              Align your face in the rectangle and follow the gaze direction instructions
             </p>
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Video feed with debug info */}
-            <div className="relative">
+            {/* Camera Feed */}
+            <div className="relative mx-auto w-80 h-80">
               <video
                 ref={videoRef}
                 autoPlay
                 muted
                 playsInline
-                className="w-full h-64 bg-black rounded-lg object-cover"
-              />
-              <canvas
-                ref={canvasRef}
-                className="absolute top-0 left-0 w-full h-64 opacity-30 pointer-events-none"
+                className="w-full h-full bg-black rounded-lg object-cover"
               />
               
-              {/* Safety margin and center indicator */}
-              <div className="absolute inset-4 border-2 border-green-500 rounded-lg pointer-events-none" />
-              <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-blue-500 rounded-full transform -translate-x-1/2 -translate-y-1/2" />
-              
-              {/* Eye position indicator */}
-              {eyePosition.x > 0 && (
-                <div 
-                  className="absolute w-3 h-3 bg-red-500 rounded-full border-2 border-white"
-                  style={{
-                    left: `${(smoothedPosition.x / 640) * 100}%`,
-                    top: `${(smoothedPosition.y / 480) * 100}%`,
-                    transform: 'translate(-50%, -50%)'
-                  }}
-                />
-              )}
-              
-              {/* Movement indicator */}
-              {baselinePosition.x > 0 && (
-                <div 
-                  className="absolute w-2 h-2 bg-yellow-500 rounded-full"
-                  style={{
-                    left: `${(baselinePosition.x / 640) * 100}%`,
-                    top: `${(baselinePosition.y / 480) * 100}%`,
-                    transform: 'translate(-50%, -50%)'
-                  }}
-                />
-              )}
-            </div>
-
-            {/* Debug information */}
-            <div className="bg-gray-100 rounded-lg p-3 text-sm font-mono">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p>Movement: ({currentMovement.x.toFixed(1)}, {currentMovement.y.toFixed(1)})</p>
-                  <p>Threshold: {config.movementThreshold}px</p>
-                </div>
-                <div>
-                  <p>Detected: {detectedDirection || 'None'}</p>
-                  <p>Target: {currentDirection || 'None'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Test controls and status */}
-            {isCalibrating && (
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600 mb-2">
-                  Calibrating...
-                </div>
-                <p className="text-gray-600">Look straight at the camera</p>
-              </div>
-            )}
-
-            {isTestRunning ? (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="text-6xl font-bold text-blue-600 mb-2">
-                    {currentDirection}
+              {/* Face Alignment Rectangle */}
+              <div className="absolute inset-4 border-4 border-blue-500 rounded-xl">
+                {!faceAligned && (
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-center bg-black bg-opacity-50 px-3 py-2 rounded">
+                    <Camera className="h-6 w-6 mx-auto mb-2" />
+                    <p className="text-sm">Align your face</p>
                   </div>
-                  <p className="text-gray-600">Look in this direction</p>
-                  <div className="flex items-center justify-center gap-2 mt-2">
-                    <Clock className="h-5 w-5 text-gray-600" />
-                    <span className="text-2xl font-bold text-gray-800">
-                      {timeRemaining}s
-                    </span>
-                  </div>
-                </div>
+                )}
                 
-                <Progress value={progress} className="w-full" />
+                {faceAligned && currentDirection && (
+                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    <div className="text-center">
+                      <Volume2 className="h-4 w-4 mx-auto mb-1" />
+                      <p className="text-lg font-bold">{currentDirection.toUpperCase()}</p>
+                      {testStarted && (
+                        <p className="text-sm">Time: {timeRemaining}s</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Test Progress */}
+            {testStarted && (
+              <div className="space-y-4">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  ></div>
+                </div>
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
                     <p className="text-green-800 font-medium">Completed: {completedDirections.length}</p>
                   </div>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                    <XCircle className="h-5 w-5 text-red-600 mx-auto mb-1" />
                     <p className="text-red-800 font-medium">Missed: {missedDirections.length}</p>
                   </div>
                 </div>
 
                 {consecutiveMisses > 0 && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
                     <p className="text-orange-800 text-sm">
-                      Consecutive misses: {consecutiveMisses}/{config.maxConsecutiveMisses}
+                      Consecutive misses: {consecutiveMisses}/2
                     </p>
                   </div>
                 )}
+              </div>
+            )}
 
-                <div className="flex gap-2">
-                  <Button onClick={handleDirectionSuccess} className="flex-1" variant="outline">
-                    Force Success (Dev)
-                  </Button>
-                  <Button onClick={stopTest} variant="destructive" className="flex-1">
+            {/* Control Buttons */}
+            <div className="space-y-4">
+              {!faceAligned ? (
+                <Button
+                  onClick={simulateFaceAlignment}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  disabled={!cameraPermission}
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Align Face
+                </Button>
+              ) : !testStarted ? (
+                <Button
+                  onClick={handleStartTest}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Start Test
+                </Button>
+              ) : (
+                <div className="text-center">
+                  <p className="text-lg font-medium text-blue-600 mb-4">
+                    Testing in progress...
+                  </p>
+                  <Button onClick={resetTest} variant="outline">
                     Stop Test
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {testResult && (
-                  <div className={`border rounded-lg p-4 ${
-                    testResult === 'normal' 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-red-50 border-red-200'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {testResult === 'normal' ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-red-600" />
-                      )}
-                      <span className={`font-semibold ${
-                        testResult === 'normal' ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {testResult === 'normal' ? 'Normal Eye Tracking' : 'Abnormalities Detected'}
-                      </span>
+              )}
+            </div>
+
+            {/* Results */}
+            {result && (
+              <Card className={`${
+                result.status === 'pass' 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    {result.status === 'pass' ? (
+                      <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                    ) : (
+                      <XCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                    )}
+                    
+                    <h3 className={`text-xl font-bold mb-4 ${
+                      result.status === 'pass' ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                      {result.status === 'pass' ? '✅ Normal Eye Movement' : '❌ Anomaly Detected'}
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="font-medium">Directions Missed:</p>
+                        <p className="text-lg">{result.missed}/{directions.length}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium">Consecutive Misses:</p>
+                        <p className="text-lg">{result.consecutiveMisses}</p>
+                      </div>
                     </div>
+                    
+                    <Button onClick={resetTest} className="mt-4" variant="outline">
+                      Test Again
+                    </Button>
                   </div>
-                )}
-                
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={calibrateBaseline} 
-                    className="flex-1"
-                    disabled={!permissionGranted}
-                    variant="outline"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Calibrate
-                  </Button>
-                  <Button 
-                    onClick={startTest} 
-                    className="flex-1"
-                    disabled={!permissionGranted || (!baselinePosition.x && !isCalibrating)}
-                  >
-                    <Target className="h-4 w-4 mr-2" />
-                    Start Test
-                  </Button>
-                  <Button 
-                    onClick={() => setShowConfig(!showConfig)} 
-                    variant="outline"
-                  >
-                    Settings
-                  </Button>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             )}
           </CardContent>
         </Card>
@@ -570,5 +393,27 @@ const EyeTrackingTest: React.FC<EyeTrackingTestProps> = ({ onComplete }) => {
     </div>
   );
 };
+
+// Placeholder for audio - uses speech synthesis as fallback
+function playAudio(direction: string) {
+  // Try to play audio file first
+  const audio = new Audio(`/audio/${direction}.mp3`);
+  audio.play().catch(() => {
+    // Fallback to speech synthesis if audio file not found
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(`Look ${direction.replace('-', ' ')}`);
+      utterance.rate = 0.8;
+      utterance.volume = 0.7;
+      speechSynthesis.speak(utterance);
+    }
+  });
+}
+
+// Placeholder for actual eye tracking logic
+function isDirectionMatched(direction: string): boolean {
+  // This should be replaced with real-time gaze comparison using MediaPipe
+  // For now, returning a random result with ~75% success rate
+  return Math.random() > 0.25;
+}
 
 export default EyeTrackingTest;

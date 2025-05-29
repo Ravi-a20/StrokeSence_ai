@@ -1,6 +1,7 @@
 
 import { Camera } from '@capacitor/camera';
 import { Filesystem } from '@capacitor/filesystem';
+import { Motion } from '@capacitor/motion';
 import { Capacitor } from '@capacitor/core';
 import { toast } from '@/hooks/use-toast';
 
@@ -8,6 +9,7 @@ export interface PermissionStatus {
   camera: boolean;
   microphone: boolean;
   storage: boolean;
+  motion: boolean;
 }
 
 class PermissionsService {
@@ -25,7 +27,8 @@ class PermissionsService {
     const permissions: PermissionStatus = {
       camera: false,
       microphone: false,
-      storage: true // Web storage is always available
+      storage: true, // Web storage is always available
+      motion: false
     };
 
     try {
@@ -46,6 +49,19 @@ class PermissionsService {
       console.log('Microphone permission denied:', error);
     }
 
+    try {
+      // Check motion permission (DeviceMotionEvent)
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+        const motionPermission = await (DeviceMotionEvent as any).requestPermission();
+        permissions.motion = motionPermission === 'granted';
+      } else {
+        // Motion is available without explicit permission on most devices
+        permissions.motion = true;
+      }
+    } catch (error) {
+      console.log('Motion permission request failed:', error);
+    }
+
     return permissions;
   }
 
@@ -53,7 +69,8 @@ class PermissionsService {
     const permissions: PermissionStatus = {
       camera: false,
       microphone: false,
-      storage: false
+      storage: false,
+      motion: false
     };
 
     try {
@@ -66,7 +83,6 @@ class PermissionsService {
 
     try {
       // For microphone on native platforms, we'll use getUserMedia as fallback
-      // or you can add a specific microphone plugin later if needed
       const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       permissions.microphone = true;
       micStream.getTracks().forEach(track => track.stop());
@@ -82,6 +98,14 @@ class PermissionsService {
       console.log('Storage permission request failed:', error);
     }
 
+    try {
+      // Request motion permission
+      await Motion.requestPermissions();
+      permissions.motion = true;
+    } catch (error) {
+      console.log('Motion permission request failed:', error);
+    }
+
     return permissions;
   }
 
@@ -94,11 +118,12 @@ class PermissionsService {
   }
 
   private async checkWebPermissions(): Promise<PermissionStatus> {
-    // For web, we'll assume permissions are granted if the user has previously allowed them
+    // For web, we'll check if permissions are available
     return {
       camera: true,
       microphone: true,
-      storage: true
+      storage: true,
+      motion: true
     };
   }
 
@@ -106,7 +131,8 @@ class PermissionsService {
     const permissions: PermissionStatus = {
       camera: false,
       microphone: false,
-      storage: false
+      storage: false,
+      motion: false
     };
 
     try {
@@ -118,7 +144,6 @@ class PermissionsService {
 
     try {
       // For microphone checking on native, we'll use a basic approach
-      // In a real app, you might want to add a proper microphone plugin
       permissions.microphone = true; // Assume granted for now
     } catch (error) {
       console.log('Microphone permission check failed:', error);
@@ -129,6 +154,13 @@ class PermissionsService {
       permissions.storage = storagePermission.publicStorage === 'granted';
     } catch (error) {
       console.log('Storage permission check failed:', error);
+    }
+
+    try {
+      // Motion permissions are typically always granted
+      permissions.motion = true;
+    } catch (error) {
+      console.log('Motion permission check failed:', error);
     }
 
     return permissions;
