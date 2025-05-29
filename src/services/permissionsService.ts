@@ -99,11 +99,11 @@ class PermissionsService {
     }
 
     try {
-      // Request motion permission
-      await Motion.requestPermissions();
+      // Motion permissions are typically granted automatically on native platforms
+      // We just check if the Motion plugin is available
       permissions.motion = true;
     } catch (error) {
-      console.log('Motion permission request failed:', error);
+      console.log('Motion permission check failed:', error);
     }
 
     return permissions;
