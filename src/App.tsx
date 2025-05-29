@@ -16,6 +16,7 @@ import SpeechTestPage from "./pages/SpeechTestPage";
 import EyeTrackingTestPage from "./pages/EyeTrackingTestPage";
 import EmergencyAssistance from "./pages/EmergencyAssistance";
 import NotFound from "./pages/NotFound";
+import ComprehensiveAnalysisPage from "./pages/ComprehensiveAnalysisPage";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => {
             <Route path="/balance-test" element={<BalanceTestPage />} />
             <Route path="/speech-test" element={<SpeechTestPage />} />
             <Route path="/eye-tracking-test" element={<EyeTrackingTestPage />} />
+            <Route path="/comprehensive-analysis" element={<ComprehensiveAnalysisPage />} />
             <Route path="/emergency" element={<EmergencyAssistance />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
