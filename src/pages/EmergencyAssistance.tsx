@@ -22,12 +22,12 @@ const EmergencyAssistance = () => {
       return;
     }
     setUser(currentUser);
-    loadAssistanceData(currentUser._id!);
+    loadAssistanceData();
   }, [navigate]);
 
-  const loadAssistanceData = async (userId: string) => {
+  const loadAssistanceData = async () => {
     try {
-      const data = await apiService.getUserTimelyAssistance(userId);
+      const data = await apiService.getUserTimelyAssistance();
       setAssistanceData(data);
     } catch (error) {
       console.error('Failed to load assistance data:', error);

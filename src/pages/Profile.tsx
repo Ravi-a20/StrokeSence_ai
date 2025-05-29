@@ -70,7 +70,7 @@ const Profile = () => {
 
     setIsLoading(true);
     try {
-      const updatedUser = await apiService.updateUser(user._id!, formData);
+      const updatedUser = await apiService.updateCurrentUser(formData);
       setUser({
         _id: updatedUser._id!,
         name: updatedUser.name,

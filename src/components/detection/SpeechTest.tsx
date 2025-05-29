@@ -107,7 +107,7 @@ const SpeechTest = () => {
     setIsAnalyzing(true);
     try {
       const audioFile = new File([audioBlob], 'speech-test.wav', { type: 'audio/wav' });
-      const result = await apiService.analyzeSpeech(currentUser._id!, audioFile);
+      const result = await apiService.analyzeSpeech(audioFile);
       
       // Display result based on API response
       if (result.stroke_detected || result.abnormality_detected) {

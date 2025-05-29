@@ -57,7 +57,7 @@ const Register = () => {
     
     setIsLoading(true);
     try {
-      await apiService.signup(formData);
+      await apiService.createUser(formData);
       toast({
         title: "Success",
         description: "Account created successfully! Please log in.",
