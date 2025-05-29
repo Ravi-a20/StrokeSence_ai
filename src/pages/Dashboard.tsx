@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from 'react-router-dom';
 import { authService, AuthUser } from '../services/authService';
-import { Brain, Activity, Mic, Shield, User, LogOut, Eye, Clock, TrendingUp } from 'lucide-react';
+import { Brain, Activity, Eye, Mic, Phone, LogOut, User } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
@@ -38,7 +38,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <Brain className="h-8 w-8 text-blue-600" />
             <h1 className="text-2xl font-bold text-blue-800">Stroke Sense</h1>
@@ -46,7 +46,7 @@ const Dashboard = () => {
           <div className="flex items-center space-x-4">
             <Button variant="outline" onClick={() => navigate('/profile')}>
               <User className="h-4 w-4 mr-2" />
-              Profile
+              Patient Profile
             </Button>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
@@ -57,152 +57,101 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-6 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+        <div className="bg-blue-50 rounded-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Welcome back, {user.name}!
           </h2>
           <p className="text-gray-600">
-            Monitor your health with our comprehensive stroke detection system
+            Your regular assessment helps us monitor your health more effectively.
           </p>
         </div>
 
-        {/* Detection Modules */}
-        <div className="mb-8">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">Detection Modules</h3>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/balance-test')}>
-              <CardHeader className="text-center pb-4">
-                <Activity className="h-12 w-12 text-blue-600 mx-auto mb-2" />
-                <CardTitle className="text-lg">Balance Test</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center pt-0">
-                <p className="text-gray-600 text-sm mb-4">
-                  Test your balance and coordination
-                </p>
-                <Button className="w-full" size="sm">
-                  Start Test
-                </Button>
-              </CardContent>
-            </Card>
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Detection Modules */}
+          <div className="lg:col-span-2">
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Detection Modules</h3>
+              <p className="text-gray-600">Select a module to perform detection</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-6 mb-8">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer text-center" onClick={() => navigate('/balance-test')}>
+                <CardContent className="p-8">
+                  <Activity className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold mb-2">Balance</h4>
+                </CardContent>
+              </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/eye-tracking-test')}>
-              <CardHeader className="text-center pb-4">
-                <Eye className="h-12 w-12 text-purple-600 mx-auto mb-2" />
-                <CardTitle className="text-lg">Eye Tracking</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center pt-0">
-                <p className="text-gray-600 text-sm mb-4">
-                  Analyze eye movement patterns
-                </p>
-                <Button className="w-full" size="sm">
-                  Start Test
-                </Button>
-              </CardContent>
-            </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer text-center" onClick={() => navigate('/eye-tracking-test')}>
+                <CardContent className="p-8">
+                  <Eye className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold mb-2">Eye Tracking</h4>
+                </CardContent>
+              </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/speech-test')}>
-              <CardHeader className="text-center pb-4">
-                <Mic className="h-12 w-12 text-green-600 mx-auto mb-2" />
-                <CardTitle className="text-lg">Speech Test</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center pt-0">
-                <p className="text-gray-600 text-sm mb-4">
-                  Detect speech impairments
-                </p>
-                <Button className="w-full" size="sm">
-                  Start Test
-                </Button>
-              </CardContent>
-            </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer text-center" onClick={() => navigate('/speech-test')}>
+                <CardContent className="p-8">
+                  <Mic className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold mb-2">Speech</h4>
+                </CardContent>
+              </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/emergency')}>
-              <CardHeader className="text-center pb-4">
-                <Shield className="h-12 w-12 text-red-600 mx-auto mb-2" />
-                <CardTitle className="text-lg">Emergency</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center pt-0">
-                <p className="text-gray-600 text-sm mb-4">
-                  Get immediate assistance
-                </p>
-                <Button variant="destructive" className="w-full" size="sm">
-                  Emergency
-                </Button>
-              </CardContent>
-            </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer text-center bg-red-50 border-red-200" onClick={() => navigate('/emergency')}>
+                <CardContent className="p-8">
+                  <Phone className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold mb-2 text-red-600">Emergency</h4>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Comprehensive Analysis Button */}
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 py-4 text-lg">
+              <Brain className="h-5 w-5 mr-2" />
+              Comprehensive Analysis
+            </Button>
+          </div>
+
+          {/* Quick Information Sidebar */}
+          <div>
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Quick Information</h3>
+              <p className="text-gray-600">Education about stroke</p>
+            </div>
+            
+            <div className="space-y-4">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4">
+                  <h4 className="font-semibold text-gray-900 mb-2">Recognizing Stroke Symptoms</h4>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4">
+                  <h4 className="font-semibold text-gray-900 mb-2">First Aid for Stroke</h4>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4">
+                  <h4 className="font-semibold text-gray-900 mb-2">Stroke Prevention</h4>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Section with Quick Information and Recent Activity */}
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Quick Information */}
+        {/* Recent Activity Section */}
+        <div className="mt-12">
+          <div className="mb-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">Recent Activity</h3>
+            <p className="text-gray-600">Your recent detection results</p>
+          </div>
+          
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
-                  <div>
-                    <h4 className="font-semibold text-sm">Recognize Stroke Signs</h4>
-                    <p className="text-xs text-gray-600">Face drooping, arm weakness, speech difficulty - call emergency immediately</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                  <div>
-                    <h4 className="font-semibold text-sm">Regular Testing</h4>
-                    <p className="text-xs text-gray-600">Take tests weekly to monitor changes in your condition</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                  <div>
-                    <h4 className="font-semibold text-sm">Stay Active</h4>
-                    <p className="text-xs text-gray-600">Regular exercise improves balance and reduces stroke risk</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Last Balance Test</p>
-                      <p className="text-xs text-gray-600">3 days ago</p>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Normal</span>
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <TrendingUp className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Health Trend</p>
-                      <p className="text-xs text-gray-600">Improving</p>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Stable</span>
-                </div>
-
-                <div className="text-center pt-4">
-                  <Button variant="outline" size="sm" className="w-full">
-                    View All Activity
-                  </Button>
-                </div>
-              </div>
+            <CardContent className="p-6">
+              <p className="text-gray-500 text-center">No recent activity to display</p>
             </CardContent>
           </Card>
         </div>
