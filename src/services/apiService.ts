@@ -38,7 +38,52 @@ export interface EmergencyContact {
 export interface SensorData {
   accel: number[][];
   gyro: number[][];
+}
+
+export interface BMI {
+  height_cm: number;
+  weight_kg: number;
+}
+
+export interface PatientCreate {
+  photo: File;
+  voice_sample: File;
+  height_cm: number;
+  weight_kg: number;
+}
+
+export interface PatientModel {
+  _id: string | null;
   user_id: string;
+  photo: string; // binary format
+  voice_sample: string; // binary format
+  bmi: BMI;
+  medical_history: MedicalHistoryEntry[];
+}
+
+export interface MedicalHistoryEntry {
+  condition: string;
+  diagnosed_at: string;
+  notes?: string;
+}
+
+export interface Detection {
+  _id: string | null;
+  user_id: string;
+  detected_at: string;
+  model_version: string;
+  input_type: 'balance' | 'slurred_speech' | 'eye' | 'comprehensive';
+  balance_test: DetectionResult | null;
+  slurred_speech_test: DetectionResult | null;
+  eye_test: DetectionResult | null;
+  overall_result: 'stroke_detected' | 'normal' | null;
+  additional_notes?: string;
+}
+
+export interface DetectionResult {
+  confidence_score: number;
+  result: 'stroke_detected' | 'normal';
+  notes?: string;
 }
 
 class ApiService {
@@ -48,23 +93,22 @@ class ApiService {
     this.baseUrl = BASE_URL;
   }
 
-  // Auth endpoints
-  async signup(userData: UserCreate): Promise<UserOut> {
-    const response = await fetch(`${this.baseUrl}/api/v1/auth/signup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Signup failed: ${response.statusText}`);
-    }
-
-    return response.json();
+  private getAuthHeaders(): HeadersInit {
+    const token = localStorage.getItem('authToken');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
   }
 
+  private getAuthHeadersMultipart(): HeadersInit {
+    const token = localStorage.getItem('authToken');
+    return {
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  }
+
+  // Auth endpoints
   async login(credentials: UserLogin): Promise<any> {
     const response = await fetch(`${this.baseUrl}/api/v1/auth/login`, {
       method: 'POST',
@@ -78,7 +122,12 @@ class ApiService {
       throw new Error(`Login failed: ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    // Store auth token if provided
+    if (result.access_token) {
+      localStorage.setItem('authToken', result.access_token);
+    }
+    return result;
   }
 
   // User management endpoints
@@ -98,12 +147,10 @@ class ApiService {
     return response.json();
   }
 
-  async getUser(userId: string): Promise<UserOut> {
-    const response = await fetch(`${this.baseUrl}/api/v1/users/${userId}`, {
+  async getCurrentUser(): Promise<UserOut> {
+    const response = await fetch(`${this.baseUrl}/api/v1/users/me`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -113,12 +160,10 @@ class ApiService {
     return response.json();
   }
 
-  async updateUser(userId: string, userData: UserUpdate): Promise<UserOut> {
-    const response = await fetch(`${this.baseUrl}/api/v1/users/${userId}`, {
+  async updateCurrentUser(userData: UserUpdate): Promise<UserOut> {
+    const response = await fetch(`${this.baseUrl}/api/v1/users/me`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify(userData),
     });
 
@@ -129,12 +174,10 @@ class ApiService {
     return response.json();
   }
 
-  async deleteUser(userId: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/v1/users/${userId}`, {
+  async deleteCurrentUser(): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/api/v1/users/me`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -142,13 +185,58 @@ class ApiService {
     }
   }
 
+  // Patient endpoints
+  async createPatientProfile(patientData: PatientCreate): Promise<PatientModel> {
+    const formData = new FormData();
+    formData.append('photo', patientData.photo);
+    formData.append('voice_sample', patientData.voice_sample);
+    formData.append('height_cm', patientData.height_cm.toString());
+    formData.append('weight_kg', patientData.weight_kg.toString());
+
+    const response = await fetch(`${this.baseUrl}/api/v1/patients/`, {
+      method: 'POST',
+      headers: this.getAuthHeadersMultipart(),
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Patient profile creation failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getPatientProfile(): Promise<PatientModel> {
+    const response = await fetch(`${this.baseUrl}/api/v1/patients/me`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Get patient profile failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getDetectionHistory(): Promise<Detection[]> {
+    const response = await fetch(`${this.baseUrl}/api/v1/patients/history/me`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Get detection history failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   // Detection endpoints
   async analyzeBalance(sensorData: SensorData): Promise<any> {
     const response = await fetch(`${this.baseUrl}/api/v1/analyze_balance`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify(sensorData),
     });
 
@@ -159,12 +247,13 @@ class ApiService {
     return response.json();
   }
 
-  async analyzeSpeech(userId: string, audioFile: File): Promise<any> {
+  async analyzeSpeech(audioFile: File): Promise<any> {
     const formData = new FormData();
     formData.append('file', audioFile);
 
-    const response = await fetch(`${this.baseUrl}/api/v1/analyze_speech?user_id=${userId}`, {
+    const response = await fetch(`${this.baseUrl}/api/v1/analyze_speech`, {
       method: 'POST',
+      headers: this.getAuthHeadersMultipart(),
       body: formData,
     });
 
@@ -176,8 +265,22 @@ class ApiService {
   }
 
   // Assistance endpoint
-  async getUserTimelyAssistance(userId: string): Promise<any> {
-    const response = await fetch(`${this.baseUrl}/api/v1/assistance/users/${userId}`, {
+  async getUserTimelyAssistance(): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/api/v1/assistance/users/`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Get assistance failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  // Health check
+  async ping(): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/ping`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -185,7 +288,7 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`Get assistance failed: ${response.statusText}`);
+      throw new Error(`Ping failed: ${response.statusText}`);
     }
 
     return response.json();

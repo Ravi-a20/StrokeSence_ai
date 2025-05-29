@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from '../services/authService';
+import { devAuthService } from '../services/devAuthService';
 import { UserLogin } from '../services/apiService';
 import { useNavigate } from 'react-router-dom';
-import { Brain } from 'lucide-react';
+import { Brain, Code } from 'lucide-react';
+import DevLoginForm from '../components/DevLoginForm';
 
 const Login = () => {
   const [formData, setFormData] = useState<UserLogin>({
@@ -16,6 +18,7 @@ const Login = () => {
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showDevMode, setShowDevMode] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -50,6 +53,18 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+  const handleDevLogin = () => {
+    navigate('/dashboard');
+  };
+
+  const handleBackToNormal = () => {
+    setShowDevMode(false);
+  };
+
+  if (showDevMode) {
+    return <DevLoginForm onDevLogin={handleDevLogin} onBackToNormal={handleBackToNormal} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
@@ -105,6 +120,18 @@ const Login = () => {
                 onClick={() => navigate('/register')}
               >
                 Register here
+              </Button>
+            </div>
+
+            <div className="border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full text-purple-600 border-purple-300 hover:bg-purple-50"
+                onClick={() => setShowDevMode(true)}
+              >
+                <Code className="h-4 w-4 mr-2" />
+                Developer Mode
               </Button>
             </div>
           </form>

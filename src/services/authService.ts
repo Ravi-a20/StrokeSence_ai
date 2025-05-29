@@ -1,5 +1,6 @@
 
 import { apiService, UserCreate, UserLogin, UserOut } from './apiService';
+import { devAuthService } from './devAuthService';
 import { DEV_MODE } from '@/config/devMode';
 
 export interface AuthUser {
@@ -25,6 +26,14 @@ class AuthService {
       this.currentUser = JSON.parse(savedUser);
     }
     
+    // Check for dev mode user
+    if (devAuthService.isDevMode()) {
+      const devUser = devAuthService.getDevUser();
+      if (devUser) {
+        this.currentUser = devUser;
+      }
+    }
+    
     // If dev mode is enabled and no user is saved, use mock user
     if (DEV_MODE.enabled && DEV_MODE.bypassAuth && !this.currentUser) {
       this.currentUser = DEV_MODE.mockUser;
@@ -42,7 +51,7 @@ class AuthService {
     }
 
     try {
-      const user = await apiService.signup(userData);
+      const user = await apiService.createUser(userData);
       const authUser: AuthUser = {
         _id: user._id!,
         name: user.name,
@@ -62,6 +71,16 @@ class AuthService {
   }
 
   async login(credentials: UserLogin): Promise<AuthUser> {
+    // Check if we're in dev mode
+    if (devAuthService.isDevMode()) {
+      const devUser = devAuthService.getDevUser();
+      if (devUser) {
+        this.currentUser = devUser;
+        localStorage.setItem('currentUser', JSON.stringify(devUser));
+        return devUser;
+      }
+    }
+
     // In dev mode with auth bypass, return mock user
     if (DEV_MODE.enabled && DEV_MODE.bypassAuth) {
       const mockUser = { ...DEV_MODE.mockUser, email: credentials.email };
@@ -94,6 +113,7 @@ class AuthService {
   logout(): void {
     this.currentUser = null;
     localStorage.removeItem('currentUser');
+    devAuthService.exitDevMode();
   }
 
   getCurrentUser(): AuthUser | null {
@@ -122,13 +142,22 @@ class AuthService {
       throw new Error('No user logged in');
     }
 
+    // In dev mode, just update local storage
+    if (devAuthService.isDevMode()) {
+      const updatedUser = { ...this.currentUser, ...userData };
+      this.currentUser = updatedUser;
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      localStorage.setItem('devUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    }
+
     try {
       const updateData = {
         name: userData.name,
         emergency_contacts: userData.emergency_contacts
       };
       
-      const updatedUser = await apiService.updateUser(this.currentUser._id, updateData);
+      const updatedUser = await apiService.updateCurrentUser(updateData);
       const authUser: AuthUser = {
         _id: updatedUser._id!,
         name: updatedUser.name,
