@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Motion } from '@capacitor/motion';
-import { apiService, SensorData } from '../../services/apiService';
-import { authService } from '../../services/authService';
+import { useNavigate } from 'react-router-dom';
+import { Phone, AlertTriangle, Activity } from 'lucide-react';
 
 interface MotionData {
   x: number;
@@ -14,64 +14,26 @@ interface MotionData {
   timestamp: number;
 }
 
-interface BalanceTestResult {
-  posture: string;
-  accelerationChange: number;
-  angularTilt: number;
-  stabilityScore: number;
+interface GaitAnalysisResult {
+  gaitVariability: number;
+  stepRegularity: number;
+  postureStability: number;
+  overallScore: number;
   isAbnormal: boolean;
 }
 
-const POSTURES = [
-  { 
-    id: 'sws_eo', 
-    name: 'Shoulder-Width Stance (Eyes Open)',
-    instruction: 'Stand with feet shoulder-width apart, eyes open. Hold phone against your back at waist level.',
-    difficulty: 1 
-  },
-  { 
-    id: 'sws_ec', 
-    name: 'Shoulder-Width Stance (Eyes Closed)',
-    instruction: 'Stand with feet shoulder-width apart, close your eyes. Keep phone against your back.',
-    difficulty: 2 
-  },
-  { 
-    id: 'fts_eo', 
-    name: 'Feet-Together Stance (Eyes Open)',
-    instruction: 'Stand with feet together, eyes open. Keep phone against your back.',
-    difficulty: 3 
-  },
-  { 
-    id: 'fts_ec', 
-    name: 'Feet-Together Stance (Eyes Closed)',
-    instruction: 'Stand with feet together, close your eyes. Keep phone against your back.',
-    difficulty: 4 
-  },
-  { 
-    id: 'sts_eo', 
-    name: 'Semi-Tandem Stance (Eyes Open)',
-    instruction: 'Step forward with one foot (heel to toe), eyes open. Keep phone against your back.',
-    difficulty: 5 
-  },
-  { 
-    id: 'sts_ec', 
-    name: 'Semi-Tandem Stance (Eyes Closed)',
-    instruction: 'Step forward with one foot (heel to toe), close your eyes. Keep phone against your back.',
-    difficulty: 6 
-  }
-];
-
 const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => {
-  const [currentPosture, setCurrentPosture] = useState(0);
   const [isTestActive, setIsTestActive] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [testProgress, setTestProgress] = useState(0);
   const [accelerometerData, setAccelerometerData] = useState<MotionData[]>([]);
   const [gyroscopeData, setGyroscopeData] = useState<MotionData[]>([]);
-  const [testResults, setTestResults] = useState<BalanceTestResult[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [testResult, setTestResult] = useState<GaitAnalysisResult | null>(null);
+  const [showEmergency, setShowEmergency] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -81,7 +43,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         setCountdown(prev => prev - 1);
       }, 1000);
     } else if (countdown === 0 && isTestActive) {
-      startMotionTracking();
+      startGaitTracking();
     }
 
     return () => {
@@ -90,22 +52,22 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
   }, [countdown, isTestActive]);
 
   const startTest = async () => {
-    setCurrentPosture(0);
     setIsTestActive(true);
     setCountdown(5);
     setTestProgress(0);
     setAccelerometerData([]);
     setGyroscopeData([]);
-    setTestResults([]);
     setShowResults(false);
+    setShowEmergency(false);
+    setTestResult(null);
     
     toast({
-      title: "Balance Assessment Starting",
-      description: `Prepare for ${POSTURES[0].name}`,
+      title: "Gait Balance Test Starting",
+      description: "Prepare to walk normally with phone held against chest",
     });
   };
 
-  const startMotionTracking = async () => {
+  const startGaitTracking = async () => {
     try {
       setAccelerometerData([]);
       setGyroscopeData([]);
@@ -121,24 +83,24 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         setAccelerometerData(prev => [...prev, data]);
       });
 
-      // Start gyroscope with 50Hz sampling rate
+      // Start gyroscope
       await Motion.addListener('orientation', (event) => {
         const data: MotionData = {
-          x: event.alpha || 0, // yaw
-          y: event.beta || 0,  // pitch
-          z: event.gamma || 0, // roll
+          x: event.alpha || 0,
+          y: event.beta || 0,
+          z: event.gamma || 0,
           timestamp: Date.now()
         };
         setGyroscopeData(prev => [...prev, data]);
       });
 
       toast({
-        title: `Test Started: ${POSTURES[currentPosture].name}`,
-        description: "Stand still with minimal body sway for 30 seconds",
+        title: "Start Walking",
+        description: "Walk naturally for 15 seconds with phone against your chest",
       });
 
-      // Run test for 30 seconds (as per research paper)
-      const testDuration = 30000;
+      // Run test for 15 seconds
+      const testDuration = 15000;
       const startTime = Date.now();
       
       const progressInterval = setInterval(() => {
@@ -148,7 +110,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         
         if (elapsed >= testDuration) {
           clearInterval(progressInterval);
-          stopCurrentTest();
+          stopGaitTest();
         }
       }, 100);
 
@@ -162,168 +124,214 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
     }
   };
 
-  const stopCurrentTest = async () => {
+  const stopGaitTest = async () => {
     try {
       await Motion.removeAllListeners();
+      setIsAnalyzing(true);
       
-      // Analyze data from 10th to 20th second (as per research paper)
-      const analysisStartTime = accelerometerData[0]?.timestamp + 10000;
-      const analysisEndTime = accelerometerData[0]?.timestamp + 20000;
+      // Analyze the gait data
+      const result = analyzeGaitPattern(accelerometerData, gyroscopeData);
+      setTestResult(result);
       
-      const accelAnalysisData = accelerometerData.filter(
-        d => d.timestamp >= analysisStartTime && d.timestamp <= analysisEndTime
-      );
-      const gyroAnalysisData = gyroscopeData.filter(
-        d => d.timestamp >= analysisStartTime && d.timestamp <= analysisEndTime
-      );
-
-      const result = analyzePosturalControl(accelAnalysisData, gyroAnalysisData);
-      
-      setTestResults(prev => [...prev, {
-        posture: POSTURES[currentPosture].name,
-        accelerationChange: result.accelerationChange,
-        angularTilt: result.angularTilt,
-        stabilityScore: result.stabilityScore,
-        isAbnormal: result.isAbnormal
-      }]);
-
-      // Move to next posture or finish
-      if (currentPosture < POSTURES.length - 1) {
-        setCurrentPosture(prev => prev + 1);
-        setCountdown(60); // 60 second break between tests
-        setTestProgress(0);
-        
+      if (result.isAbnormal) {
+        // Abnormal gait detected - go directly to emergency
+        setShowEmergency(true);
         toast({
-          title: "Posture Complete",
-          description: `60 second break. Next: ${POSTURES[currentPosture + 1].name}`,
+          title: "Abnormal Gait Detected",
+          description: "Emergency assistance activated",
+          variant: "destructive",
         });
       } else {
-        // All postures complete
-        setIsTestActive(false);
-        setIsAnalyzing(true);
-        await finalAnalysis();
+        setShowResults(true);
+        toast({
+          title: "Gait Analysis Complete",
+          description: "Normal walking pattern detected",
+        });
       }
+
+      setIsAnalyzing(false);
+      setIsTestActive(false);
+
+      // Call completion callback
+      if (onComplete) {
+        onComplete({
+          stroke_detected: result.isAbnormal,
+          abnormality_detected: result.isAbnormal,
+          gait_analysis: result
+        });
+      }
+
     } catch (error) {
-      console.error('Failed to stop motion tracking:', error);
+      console.error('Failed to stop gait tracking:', error);
+      setIsAnalyzing(false);
     }
   };
 
-  // Research paper algorithm implementation
-  const analyzePosturalControl = (accelData: MotionData[], gyroData: MotionData[]) => {
-    if (accelData.length < 2 || gyroData.length < 2) {
-      return { accelerationChange: 0, angularTilt: 0, stabilityScore: 0, isAbnormal: true };
+  const analyzeGaitPattern = (accelData: MotionData[], gyroData: MotionData[]): GaitAnalysisResult => {
+    if (accelData.length < 10 || gyroData.length < 10) {
+      return { 
+        gaitVariability: 0, 
+        stepRegularity: 0, 
+        postureStability: 0, 
+        overallScore: 0, 
+        isAbnormal: true 
+      };
     }
 
-    // Calculate combined acceleration changes (Algorithm 1 from paper)
-    let totalAccelChange = 0;
+    // Calculate gait variability from acceleration changes
+    let totalVariability = 0;
     for (let i = 1; i < accelData.length; i++) {
       const dx = accelData[i].x - accelData[i-1].x;
       const dy = accelData[i].y - accelData[i-1].y;
-      totalAccelChange += Math.sqrt(dx * dx + dy * dy);
+      const dz = accelData[i].z - accelData[i-1].z;
+      totalVariability += Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
-    const avgAccelChange = totalAccelChange / (accelData.length - 1);
+    const gaitVariability = totalVariability / (accelData.length - 1);
 
-    // Calculate angular tilt (Algorithm 2 from paper)
-    const samplingRate = 50; // 50 Hz
-    let totalAngularTilt = 0;
-    
+    // Calculate step regularity from vertical acceleration patterns
+    const verticalAccel = accelData.map(d => d.z);
+    const stepRegularity = calculateStepRegularity(verticalAccel);
+
+    // Calculate postural stability from gyroscope data
+    let totalAngularChange = 0;
     for (const gyroPoint of gyroData) {
-      const pitchDeg = Math.abs(gyroPoint.x) / samplingRate * (180 / Math.PI);
-      const rollDeg = Math.abs(gyroPoint.y) / samplingRate * (180 / Math.PI);
-      const yawDeg = Math.abs(gyroPoint.z) / samplingRate * (180 / Math.PI);
-      totalAngularTilt += pitchDeg + rollDeg + yawDeg;
+      const angularMagnitude = Math.sqrt(
+        Math.pow(gyroPoint.x, 2) + 
+        Math.pow(gyroPoint.y, 2) + 
+        Math.pow(gyroPoint.z, 2)
+      );
+      totalAngularChange += angularMagnitude;
     }
+    const postureStability = totalAngularChange / gyroData.length;
 
-    // Calculate stability score (lower is better)
-    const stabilityScore = (avgAccelChange * 0.6) + (totalAngularTilt * 0.4);
-    
-    // Determine if abnormal based on posture difficulty and thresholds
-    const postureDifficulty = POSTURES[currentPosture].difficulty;
-    const threshold = getThresholdForPosture(postureDifficulty);
-    const isAbnormal = stabilityScore > threshold;
+    // Calculate overall score (lower is better)
+    const overallScore = (gaitVariability * 0.4) + (stepRegularity * 0.3) + (postureStability * 0.3);
+
+    // Determine if abnormal (thresholds based on stroke gait research)
+    const isAbnormal = gaitVariability > 2.5 || stepRegularity > 3.0 || postureStability > 4.0 || overallScore > 8.0;
 
     return {
-      accelerationChange: avgAccelChange,
-      angularTilt: totalAngularTilt,
-      stabilityScore,
+      gaitVariability,
+      stepRegularity,
+      postureStability,
+      overallScore,
       isAbnormal
     };
   };
 
-  const getThresholdForPosture = (difficulty: number): number => {
-    // Thresholds based on research findings - adjust based on validation
-    const thresholds = {
-      1: 2.0,  // SWS E/O - easiest
-      2: 2.5,  // SWS E/C
-      3: 3.0,  // FTS E/O
-      4: 3.5,  // FTS E/C
-      5: 4.0,  // STS E/O
-      6: 4.5   // STS E/C - hardest
-    };
-    return thresholds[difficulty as keyof typeof thresholds] || 3.0;
-  };
+  const calculateStepRegularity = (verticalAccel: number[]): number => {
+    // Simple step detection based on vertical acceleration peaks
+    const threshold = 0.5;
+    let stepCount = 0;
+    let stepIntervals: number[] = [];
+    let lastStepTime = 0;
 
-  const finalAnalysis = async () => {
-    try {
-      const abnormalCount = testResults.filter(r => r.isAbnormal).length;
-      const overallStabilityScore = testResults.reduce((sum, r) => sum + r.stabilityScore, 0) / testResults.length;
-      
-      // If 3 or more postures show abnormality, or overall stability is very poor
-      const strokeRisk = abnormalCount >= 3 || overallStabilityScore > 15;
-      
-      const analysisResult = {
-        stroke_detected: strokeRisk,
-        abnormality_detected: abnormalCount >= 2,
-        detailed_results: testResults,
-        overall_stability_score: overallStabilityScore,
-        abnormal_postures: abnormalCount
-      };
-
-      setShowResults(true);
-      setIsAnalyzing(false);
-
-      // Call the completion callback for comprehensive analysis
-      if (onComplete) {
-        onComplete(analysisResult);
+    for (let i = 1; i < verticalAccel.length - 1; i++) {
+      if (verticalAccel[i] > verticalAccel[i-1] && 
+          verticalAccel[i] > verticalAccel[i+1] && 
+          verticalAccel[i] > threshold) {
+        if (lastStepTime > 0) {
+          stepIntervals.push(i - lastStepTime);
+        }
+        lastStepTime = i;
+        stepCount++;
       }
-
-      toast({
-        title: "Balance Analysis Complete",
-        description: strokeRisk ? "Potential balance issues detected" : "Balance assessment completed",
-        variant: strokeRisk ? "destructive" : "default",
-      });
-    } catch (error) {
-      console.error('Balance analysis failed:', error);
-      setIsAnalyzing(false);
-      toast({
-        title: "Analysis Error",
-        description: "Failed to analyze balance data",
-        variant: "destructive",
-      });
     }
+
+    if (stepIntervals.length < 2) return 5.0; // High irregularity if too few steps
+
+    // Calculate coefficient of variation for step intervals
+    const mean = stepIntervals.reduce((a, b) => a + b, 0) / stepIntervals.length;
+    const variance = stepIntervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / stepIntervals.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return (stdDev / mean) * 100; // Coefficient of variation as percentage
   };
+
+  const callEmergencyServices = () => {
+    window.open('tel:911');
+    toast({
+      title: "Emergency Call",
+      description: "Calling emergency services...",
+      variant: "destructive",
+    });
+  };
+
+  const goToEmergencyPage = () => {
+    navigate('/emergency');
+  };
+
+  if (showEmergency) {
+    return (
+      <div className="p-4 max-w-md mx-auto">
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader className="text-center">
+            <AlertTriangle className="h-16 w-16 text-red-600 mx-auto mb-4" />
+            <CardTitle className="text-red-800 text-2xl">Abnormal Gait Detected</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-red-700 text-center mb-6">
+              Your walking pattern shows irregularities that may indicate balance issues. 
+              Please seek immediate medical attention.
+            </p>
+            
+            <Button 
+              onClick={callEmergencyServices}
+              variant="destructive" 
+              size="lg" 
+              className="w-full text-lg py-4"
+            >
+              <Phone className="h-6 w-6 mr-2" />
+              Call 911 Emergency Services
+            </Button>
+            
+            <Button 
+              onClick={goToEmergencyPage}
+              variant="outline" 
+              className="w-full border-red-300 text-red-700"
+            >
+              <AlertTriangle className="h-5 w-5 mr-2" />
+              Emergency Assistance Page
+            </Button>
+            
+            <div className="bg-red-100 p-4 rounded-lg mt-4">
+              <h4 className="font-semibold text-red-800 mb-2">Test Results:</h4>
+              <div className="text-sm text-red-700 space-y-1">
+                <p>Gait Variability: {testResult?.gaitVariability.toFixed(2)}</p>
+                <p>Step Regularity: {testResult?.stepRegularity.toFixed(2)}</p>
+                <p>Posture Stability: {testResult?.postureStability.toFixed(2)}</p>
+                <p>Overall Score: {testResult?.overallScore.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 max-w-md mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-center text-blue-800">
-            Research-Based Balance Assessment
+          <CardTitle className="text-center text-blue-800 flex items-center justify-center">
+            <Activity className="h-6 w-6 mr-2" />
+            Quick Gait Balance Test
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {!isTestActive && !showResults && (
             <div className="text-center space-y-4">
               <p className="text-gray-600">
-                This test uses 6 validated postures to assess balance control. 
-                Each posture is held for 30 seconds with 60-second breaks.
+                This test analyzes your walking pattern to detect balance abnormalities. 
+                Simply hold your phone against your chest and walk naturally for 15 seconds.
               </p>
               <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-blue-800 mb-2">Test Sequence:</h4>
-                <ol className="text-sm text-blue-700 space-y-1">
-                  {POSTURES.map((posture, index) => (
-                    <li key={index}>{index + 1}. {posture.name}</li>
-                  ))}
+                <h4 className="font-semibold text-blue-800 mb-2">Instructions:</h4>
+                <ol className="text-sm text-blue-700 space-y-2 text-left">
+                  <li>1. Hold phone firmly against your chest</li>
+                  <li>2. Walk at your normal pace</li>
+                  <li>3. Walk in a straight line if possible</li>
+                  <li>4. Keep the phone steady against your body</li>
                 </ol>
               </div>
             </div>
@@ -332,29 +340,19 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
           {countdown > 0 && (
             <div className="text-center">
               <div className="text-6xl font-bold text-blue-600 mb-2">{countdown}</div>
-              <p className="text-gray-600">
-                {countdown > 30 ? 'Break time...' : 'Get ready...'}
-              </p>
-              {countdown <= 5 && countdown > 0 && (
-                <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
-                  <h4 className="font-semibold text-yellow-800">
-                    {POSTURES[currentPosture].name}
-                  </h4>
-                  <p className="text-sm text-yellow-700 mt-2">
-                    {POSTURES[currentPosture].instruction}
-                  </p>
-                </div>
-              )}
+              <p className="text-gray-600">Get ready to walk...</p>
+              <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
+                <p className="text-sm text-yellow-700">
+                  Position your phone against your chest and prepare to walk naturally
+                </p>
+              </div>
             </div>
           )}
 
           {isTestActive && countdown === 0 && (
             <div className="text-center space-y-4">
               <div className="text-2xl font-bold text-green-600">
-                {POSTURES[currentPosture].name}
-              </div>
-              <div className="text-sm text-gray-600">
-                Posture {currentPosture + 1} of {POSTURES.length}
+                Walking Test Active
               </div>
               <div className="w-full bg-gray-200 rounded-full h-4">
                 <div 
@@ -363,50 +361,53 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
                 ></div>
               </div>
               <p className="text-sm text-gray-600">
-                Stand still with minimal sway: {Math.round(30 - (testProgress * 0.3))}s remaining
+                Keep walking naturally: {Math.round(15 - (testProgress * 0.15))}s remaining
               </p>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm text-green-700">
+                  📱 Keep phone against chest<br/>
+                  👟 Walk at normal pace<br/>
+                  ➡️ Walk in straight line
+                </p>
+              </div>
             </div>
           )}
 
           {isAnalyzing && (
             <div className="text-center space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-gray-600">Analyzing balance patterns...</p>
-              <p className="text-sm text-gray-500">Using research-validated algorithms</p>
+              <p className="text-gray-600">Analyzing gait pattern...</p>
+              <p className="text-sm text-gray-500">Detecting balance abnormalities</p>
             </div>
           )}
 
-          {showResults && (
+          {showResults && testResult && (
             <div className="space-y-4">
-              <h3 className="font-semibold text-center">Assessment Results</h3>
-              <div className="space-y-2">
-                {testResults.map((result, index) => (
-                  <div key={index} className={`p-3 rounded-lg border ${
-                    result.isAbnormal ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{result.posture}</span>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        result.isAbnormal ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                      }`}>
-                        {result.isAbnormal ? 'Abnormal' : 'Normal'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      Stability Score: {result.stabilityScore.toFixed(2)}
-                    </div>
+              <h3 className="font-semibold text-center text-green-800">✅ Normal Gait Pattern</h3>
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <h4 className="font-semibold text-green-800 mb-2">Test Results:</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Gait Variability:</span>
+                    <span className="font-medium">{testResult.gaitVariability.toFixed(2)}</span>
                   </div>
-                ))}
+                  <div className="flex justify-between">
+                    <span>Step Regularity:</span>
+                    <span className="font-medium">{testResult.stepRegularity.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Posture Stability:</span>
+                    <span className="font-medium">{testResult.postureStability.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="font-semibold">Overall Score:</span>
+                    <span className="font-bold text-green-600">{testResult.overallScore.toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold mb-2">Overall Assessment:</h4>
                 <p className="text-sm text-gray-700">
-                  {testResults.filter(r => r.isAbnormal).length >= 3 
-                    ? "Multiple balance abnormalities detected. Recommend medical consultation."
-                    : testResults.filter(r => r.isAbnormal).length >= 2
-                    ? "Some balance concerns noted. Monitor symptoms."
-                    : "Balance performance within normal range."
-                  }
+                  Your walking pattern appears normal with no significant balance abnormalities detected.
                 </p>
               </div>
             </div>
@@ -417,7 +418,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
             disabled={isTestActive || isAnalyzing}
             className="w-full"
           >
-            {isTestActive ? 'Assessment in Progress...' : showResults ? 'Restart Assessment' : 'Start Balance Assessment'}
+            {isTestActive ? 'Test in Progress...' : showResults ? 'Restart Test' : 'Start Gait Test'}
           </Button>
         </CardContent>
       </Card>
