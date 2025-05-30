@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -15,9 +15,8 @@ interface MotionData {
 }
 
 interface GaitAnalysisResult {
-  gaitVariability: number;
-  stepRegularity: number;
-  postureStability: number;
+  accelerationChange: number;
+  angularTilt: number;
   overallScore: number;
   isAbnormal: boolean;
 }
@@ -34,6 +33,8 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
   const [showEmergency, setShowEmergency] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const accelListenerRef = useRef<any>(null);
+  const gyroListenerRef = useRef<any>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -50,6 +51,28 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       if (interval) clearInterval(interval);
     };
   }, [countdown, isTestActive]);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup listeners on unmount
+      stopMotionListeners();
+    };
+  }, []);
+
+  const stopMotionListeners = async () => {
+    try {
+      if (accelListenerRef.current) {
+        await accelListenerRef.current.remove();
+        accelListenerRef.current = null;
+      }
+      if (gyroListenerRef.current) {
+        await gyroListenerRef.current.remove();
+        gyroListenerRef.current = null;
+      }
+    } catch (error) {
+      console.error('Error stopping motion listeners:', error);
+    }
+  };
 
   const startTest = async () => {
     setIsTestActive(true);
@@ -72,25 +95,29 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       setAccelerometerData([]);
       setGyroscopeData([]);
 
-      // Start accelerometer with 50Hz sampling rate
-      await Motion.addListener('accel', (event) => {
+      console.log('Starting motion tracking...');
+
+      // Start accelerometer
+      accelListenerRef.current = await Motion.addListener('accel', (event) => {
         const data: MotionData = {
           x: event.acceleration.x,
           y: event.acceleration.y,
           z: event.acceleration.z,
           timestamp: Date.now()
         };
+        console.log('Accel data:', data);
         setAccelerometerData(prev => [...prev, data]);
       });
 
       // Start gyroscope
-      await Motion.addListener('orientation', (event) => {
+      gyroListenerRef.current = await Motion.addListener('orientation', (event) => {
         const data: MotionData = {
           x: event.alpha || 0,
           y: event.beta || 0,
           z: event.gamma || 0,
           timestamp: Date.now()
         };
+        console.log('Gyro data:', data);
         setGyroscopeData(prev => [...prev, data]);
       });
 
@@ -118,23 +145,66 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       console.error('Failed to start motion tracking:', error);
       toast({
         title: "Error",
-        description: "Failed to start motion sensors",
+        description: "Failed to start motion sensors. Using simulated data for demo.",
         variant: "destructive",
       });
+      
+      // Fallback to simulated data for web testing
+      simulateMotionData();
     }
   };
 
+  const simulateMotionData = () => {
+    console.log('Using simulated motion data...');
+    const testDuration = 15000;
+    const startTime = Date.now();
+    
+    const simulationInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / testDuration) * 100, 100);
+      setTestProgress(progress);
+      
+      // Generate realistic motion data
+      const accelData: MotionData = {
+        x: (Math.random() - 0.5) * 4 + Math.sin(elapsed / 500) * 2,
+        y: (Math.random() - 0.5) * 4 + Math.cos(elapsed / 600) * 1.5,
+        z: 9.8 + (Math.random() - 0.5) * 3,
+        timestamp: Date.now()
+      };
+      
+      const gyroData: MotionData = {
+        x: (Math.random() - 0.5) * 0.3,
+        y: (Math.random() - 0.5) * 0.3,
+        z: (Math.random() - 0.5) * 0.2,
+        timestamp: Date.now()
+      };
+      
+      setAccelerometerData(prev => [...prev, accelData]);
+      setGyroscopeData(prev => [...prev, gyroData]);
+      
+      if (elapsed >= testDuration) {
+        clearInterval(simulationInterval);
+        stopGaitTest();
+      }
+    }, 50);
+  };
+
   const stopGaitTest = async () => {
+    console.log('Stopping gait test...');
     try {
-      await Motion.removeAllListeners();
+      await stopMotionListeners();
       setIsAnalyzing(true);
+      
+      console.log('Accel data points:', accelerometerData.length);
+      console.log('Gyro data points:', gyroscopeData.length);
       
       // Analyze the gait data
       const result = analyzeGaitPattern(accelerometerData, gyroscopeData);
       setTestResult(result);
       
+      console.log('Analysis result:', result);
+      
       if (result.isAbnormal) {
-        // Abnormal gait detected - go directly to emergency
         setShowEmergency(true);
         toast({
           title: "Abnormal Gait Detected",
@@ -152,7 +222,6 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       setIsAnalyzing(false);
       setIsTestActive(false);
 
-      // Call completion callback
       if (onComplete) {
         onComplete({
           stroke_detected: result.isAbnormal,
@@ -168,84 +237,59 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
   };
 
   const analyzeGaitPattern = (accelData: MotionData[], gyroData: MotionData[]): GaitAnalysisResult => {
-    if (accelData.length < 10 || gyroData.length < 10) {
+    if (accelData.length < 10) {
+      console.log('Insufficient acceleration data');
       return { 
-        gaitVariability: 0, 
-        stepRegularity: 0, 
-        postureStability: 0, 
+        accelerationChange: 0, 
+        angularTilt: 0, 
         overallScore: 0, 
         isAbnormal: true 
       };
     }
 
-    // Calculate gait variability from acceleration changes
-    let totalVariability = 0;
+    // Calculate acceleration change using the research formula
+    let totalAccelChange = 0;
     for (let i = 1; i < accelData.length; i++) {
       const dx = accelData[i].x - accelData[i-1].x;
       const dy = accelData[i].y - accelData[i-1].y;
-      const dz = accelData[i].z - accelData[i-1].z;
-      totalVariability += Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const change = Math.sqrt(dx * dx + dy * dy);
+      totalAccelChange += change;
     }
-    const gaitVariability = totalVariability / (accelData.length - 1);
+    const accelerationChange = totalAccelChange / (accelData.length - 1);
 
-    // Calculate step regularity from vertical acceleration patterns
-    const verticalAccel = accelData.map(d => d.z);
-    const stepRegularity = calculateStepRegularity(verticalAccel);
-
-    // Calculate postural stability from gyroscope data
-    let totalAngularChange = 0;
-    for (const gyroPoint of gyroData) {
-      const angularMagnitude = Math.sqrt(
-        Math.pow(gyroPoint.x, 2) + 
-        Math.pow(gyroPoint.y, 2) + 
-        Math.pow(gyroPoint.z, 2)
-      );
-      totalAngularChange += angularMagnitude;
+    // Calculate angular tilt using the research formula
+    let totalAngularTilt = 0;
+    if (gyroData.length > 0) {
+      const samplingRate = 50; // 50 Hz
+      for (const gyroPoint of gyroData) {
+        const ax = Math.abs(gyroPoint.x) / samplingRate * (180 / Math.PI);
+        const ay = Math.abs(gyroPoint.y) / samplingRate * (180 / Math.PI);
+        const az = Math.abs(gyroPoint.z) / samplingRate * (180 / Math.PI);
+        totalAngularTilt += ax + ay + az;
+      }
     }
-    const postureStability = totalAngularChange / gyroData.length;
+    const angularTilt = totalAngularTilt;
 
-    // Calculate overall score (lower is better)
-    const overallScore = (gaitVariability * 0.4) + (stepRegularity * 0.3) + (postureStability * 0.3);
+    // Calculate overall score
+    const overallScore = accelerationChange * 0.6 + angularTilt * 0.4;
 
-    // Determine if abnormal (thresholds based on stroke gait research)
-    const isAbnormal = gaitVariability > 2.5 || stepRegularity > 3.0 || postureStability > 4.0 || overallScore > 8.0;
+    console.log('Analysis:', {
+      accelerationChange,
+      angularTilt,
+      overallScore,
+      accelDataLength: accelData.length,
+      gyroDataLength: gyroData.length
+    });
+
+    // Determine if abnormal (adjusted thresholds for walking test)
+    const isAbnormal = accelerationChange > 3.0 || angularTilt > 15.0 || overallScore > 12.0;
 
     return {
-      gaitVariability,
-      stepRegularity,
-      postureStability,
+      accelerationChange,
+      angularTilt,
       overallScore,
       isAbnormal
     };
-  };
-
-  const calculateStepRegularity = (verticalAccel: number[]): number => {
-    // Simple step detection based on vertical acceleration peaks
-    const threshold = 0.5;
-    let stepCount = 0;
-    let stepIntervals: number[] = [];
-    let lastStepTime = 0;
-
-    for (let i = 1; i < verticalAccel.length - 1; i++) {
-      if (verticalAccel[i] > verticalAccel[i-1] && 
-          verticalAccel[i] > verticalAccel[i+1] && 
-          verticalAccel[i] > threshold) {
-        if (lastStepTime > 0) {
-          stepIntervals.push(i - lastStepTime);
-        }
-        lastStepTime = i;
-        stepCount++;
-      }
-    }
-
-    if (stepIntervals.length < 2) return 5.0; // High irregularity if too few steps
-
-    // Calculate coefficient of variation for step intervals
-    const mean = stepIntervals.reduce((a, b) => a + b, 0) / stepIntervals.length;
-    const variance = stepIntervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / stepIntervals.length;
-    const stdDev = Math.sqrt(variance);
-    
-    return (stdDev / mean) * 100; // Coefficient of variation as percentage
   };
 
   const callEmergencyServices = () => {
@@ -294,15 +338,16 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
               Emergency Assistance Page
             </Button>
             
-            <div className="bg-red-100 p-4 rounded-lg mt-4">
-              <h4 className="font-semibold text-red-800 mb-2">Test Results:</h4>
-              <div className="text-sm text-red-700 space-y-1">
-                <p>Gait Variability: {testResult?.gaitVariability.toFixed(2)}</p>
-                <p>Step Regularity: {testResult?.stepRegularity.toFixed(2)}</p>
-                <p>Posture Stability: {testResult?.postureStability.toFixed(2)}</p>
-                <p>Overall Score: {testResult?.overallScore.toFixed(2)}</p>
+            {testResult && (
+              <div className="bg-red-100 p-4 rounded-lg mt-4">
+                <h4 className="font-semibold text-red-800 mb-2">Test Results:</h4>
+                <div className="text-sm text-red-700 space-y-1">
+                  <p>Acceleration Change: {testResult.accelerationChange.toFixed(2)}</p>
+                  <p>Angular Tilt: {testResult.angularTilt.toFixed(2)}</p>
+                  <p>Overall Score: {testResult.overallScore.toFixed(2)}</p>
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -377,7 +422,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
             <div className="text-center space-y-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
               <p className="text-gray-600">Analyzing gait pattern...</p>
-              <p className="text-sm text-gray-500">Detecting balance abnormalities</p>
+              <p className="text-sm text-gray-500">Processing sensor data...</p>
             </div>
           )}
 
@@ -388,16 +433,12 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
                 <h4 className="font-semibold text-green-800 mb-2">Test Results:</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Gait Variability:</span>
-                    <span className="font-medium">{testResult.gaitVariability.toFixed(2)}</span>
+                    <span>Acceleration Change:</span>
+                    <span className="font-medium">{testResult.accelerationChange.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Step Regularity:</span>
-                    <span className="font-medium">{testResult.stepRegularity.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Posture Stability:</span>
-                    <span className="font-medium">{testResult.postureStability.toFixed(2)}</span>
+                    <span>Angular Tilt:</span>
+                    <span className="font-medium">{testResult.angularTilt.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-semibold">Overall Score:</span>
