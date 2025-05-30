@@ -41,15 +41,7 @@ const Login = () => {
         description: "Login successful!",
         variant: "default",
       });
-      
-      // Check if user has completed profile
-      try {
-        await apiService.getPatientProfile();
-        navigate('/dashboard');
-      } catch (error) {
-        // If no patient profile exists, redirect to profile completion
-        navigate('/complete-profile');
-      }
+      navigate('/dashboard');
     } catch (error) {
       console.error('Login failed:', error);
       toast({
