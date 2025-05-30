@@ -1,4 +1,3 @@
-
 const BASE_URL = 'http://localhost:8000'; // You can change this to your backend URL
 
 export interface UserCreate {
@@ -68,7 +67,7 @@ export interface MedicalHistoryEntry {
 }
 
 export interface Detection {
-  _id: string | null;
+  id?: string;
   user_id: string;
   detected_at: string;
   model_version: string;

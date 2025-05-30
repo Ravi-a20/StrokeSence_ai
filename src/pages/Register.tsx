@@ -1,9 +1,9 @@
 
 import React from 'react';
-import PatientRegistrationForm from '../components/PatientRegistrationForm';
+import SimpleRegistrationForm from '../components/SimpleRegistrationForm';
 
 const Register = () => {
-  return <PatientRegistrationForm />;
+  return <SimpleRegistrationForm />;
 };
 
 export default Register;
