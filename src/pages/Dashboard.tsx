@@ -47,149 +47,126 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <Brain className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-blue-800">Stroke Sense</h1>
+    <div className="min-h-screen bg-white">
+      {/* Mobile Header */}
+      <header className="bg-white p-4 flex justify-between items-center border-b border-gray-100">
+        <div className="flex items-center space-x-3">
+          <Brain className="h-8 w-8 text-blue-600" />
+          <div>
+            <h1 className="text-xl font-bold text-blue-600">Stroke</h1>
+            <h1 className="text-xl font-bold text-blue-600 -mt-1">Sense</h1>
           </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" onClick={() => navigate('/profile')}>
-              <User className="h-4 w-4 mr-2" />
-              Patient Profile
-            </Button>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/profile')} className="text-xs px-3 py-2">
+            Patient Profile
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleLogout} className="text-xs px-3 py-1">
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
+      <main className="p-4 space-y-6">
         {/* Welcome Section */}
-        <div className="bg-blue-50 rounded-lg p-6 mb-8 animate-fade-in">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Welcome back, {user.name}!
-          </h2>
-          <p className="text-gray-600">
-            Regular stroke detection assessments help monitor your neurological health effectively.
-          </p>
-        </div>
+        <Card className="bg-blue-50 border-blue-100">
+          <CardContent className="p-4">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">
+              Welcome back, !
+            </h2>
+            <p className="text-sm text-gray-600">
+              Your regular assessment helps us monitor your health more effectively.
+            </p>
+          </CardContent>
+        </Card>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Detection Modules */}
-          <div className="lg:col-span-2">
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Stroke Detection Modules</h3>
-              <p className="text-gray-600">Advanced AI-powered tests to detect early stroke symptoms</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-6 mb-8">
-              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer text-center hover-scale" onClick={() => navigate('/balance-test')}>
-                <CardContent className="p-8">
-                  <Activity className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                  <h4 className="text-lg font-semibold mb-2">Balance Detection</h4>
-                  <p className="text-sm text-gray-600">Analyze gait and balance patterns</p>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer text-center hover-scale" onClick={() => navigate('/eye-tracking-test')}>
-                <CardContent className="p-8">
-                  <Eye className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                  <h4 className="text-lg font-semibold mb-2">Eye Tracking</h4>
-                  <p className="text-sm text-gray-600">Monitor eye movement patterns</p>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer text-center hover-scale" onClick={() => navigate('/speech-test')}>
-                <CardContent className="p-8">
-                  <Mic className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                  <h4 className="text-lg font-semibold mb-2">Speech Analysis</h4>
-                  <p className="text-sm text-gray-600">Detect speech abnormalities</p>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer text-center bg-red-50 border-red-200 hover-scale" onClick={() => navigate('/emergency')}>
-                <CardContent className="p-8">
-                  <Phone className="h-12 w-12 text-red-600 mx-auto mb-4" />
-                  <h4 className="text-lg font-semibold mb-2 text-red-600">Emergency</h4>
-                  <p className="text-sm text-red-600">Immediate assistance</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Comprehensive Analysis Button */}
-            <Button 
-              onClick={handleComprehensiveAnalysis}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 py-6 text-lg animate-scale-in"
-            >
-              <Brain className="h-6 w-6 mr-3" />
-              Start Comprehensive Stroke Analysis
-              <span className="ml-2 text-sm opacity-90">(All Tests)</span>
-            </Button>
-          </div>
-
-          {/* Quick Information Sidebar */}
-          <div>
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Stroke Education</h3>
-              <p className="text-gray-600">Essential information about stroke recognition and prevention</p>
-            </div>
-            
-            <div className="space-y-4">
-              <Card 
-                className="hover:shadow-md transition-all duration-300 cursor-pointer hover-scale"
-                onClick={() => setActiveInfo('symptoms')}
-              >
-                <CardContent className="p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">🧠 Recognizing Stroke Symptoms</h4>
-                  <p className="text-sm text-gray-600">Learn the F.A.S.T method and warning signs</p>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className="hover:shadow-md transition-all duration-300 cursor-pointer hover-scale"
-                onClick={() => setActiveInfo('firstaid')}
-              >
-                <CardContent className="p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">🚑 First Aid for Stroke</h4>
-                  <p className="text-sm text-gray-600">Critical emergency response steps</p>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className="hover:shadow-md transition-all duration-300 cursor-pointer hover-scale"
-                onClick={() => setActiveInfo('prevention')}
-              >
-                <CardContent className="p-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">🛡️ Stroke Prevention</h4>
-                  <p className="text-sm text-gray-600">Lifestyle changes and risk management</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity Section */}
-        <div className="mt-12">
-          <div className="mb-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Recent Detection Results</h3>
-            <p className="text-gray-600">Your recent stroke detection test results and progress</p>
-          </div>
+        {/* Detection Modules */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-1">Detection Modules</h3>
+          <p className="text-sm text-gray-600 mb-4">Select a module to perform detection</p>
           
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-gray-500 text-center">No recent activity to display</p>
-              <p className="text-gray-400 text-center text-sm mt-2">
-                Complete your first assessment to see results here
-              </p>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <Card 
+              className="hover:shadow-md transition-all duration-300 cursor-pointer text-center border-gray-200" 
+              onClick={() => navigate('/balance-test')}
+            >
+              <CardContent className="p-6">
+                <Activity className="h-8 w-8 text-gray-700 mx-auto mb-3" />
+                <h4 className="text-base font-medium text-gray-900">Balance</h4>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="hover:shadow-md transition-all duration-300 cursor-pointer text-center border-gray-200" 
+              onClick={() => navigate('/eye-tracking-test')}
+            >
+              <CardContent className="p-6">
+                <Eye className="h-8 w-8 text-gray-700 mx-auto mb-3" />
+                <h4 className="text-base font-medium text-gray-900">Eye Tracking</h4>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="hover:shadow-md transition-all duration-300 cursor-pointer text-center border-gray-200" 
+              onClick={() => navigate('/speech-test')}
+            >
+              <CardContent className="p-6">
+                <Mic className="h-8 w-8 text-gray-700 mx-auto mb-3" />
+                <h4 className="text-base font-medium text-gray-900">Speech</h4>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="hover:shadow-md transition-all duration-300 cursor-pointer text-center bg-red-50 border-red-200" 
+              onClick={() => navigate('/emergency')}
+            >
+              <CardContent className="p-6">
+                <Phone className="h-8 w-8 text-red-600 mx-auto mb-3" />
+                <h4 className="text-base font-medium text-red-600">Emergency</h4>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Comprehensive Analysis Button */}
+          <Button 
+            onClick={handleComprehensiveAnalysis}
+            className="w-full bg-blue-600 hover:bg-blue-700 py-4 text-base font-medium"
+          >
+            <Brain className="h-5 w-5 mr-3" />
+            Comprehensive Analysis
+          </Button>
         </div>
+
+        {/* Quick Information */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-gray-900">Quick Information</CardTitle>
+            <p className="text-sm text-gray-600">Education about stroke</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div 
+              className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => setActiveInfo('symptoms')}
+            >
+              <h4 className="font-medium text-gray-900">Recognizing Stroke Symptoms</h4>
+            </div>
+
+            <div 
+              className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => setActiveInfo('firstaid')}
+            >
+              <h4 className="font-medium text-gray-900">First Aid for Stroke</h4>
+            </div>
+
+            <div 
+              className="p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => setActiveInfo('prevention')}
+            >
+              <h4 className="font-medium text-gray-900">Stroke Prevention</h4>
+            </div>
+          </CardContent>
+        </Card>
       </main>
 
       {/* Information Modals */}
