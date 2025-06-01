@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Motion } from '@capacitor/motion';
 import { useNavigate } from 'react-router-dom';
 import { Phone, AlertTriangle, Activity } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface MotionData {
   x: number;
@@ -14,9 +14,9 @@ interface MotionData {
   timestamp: number;
 }
 
-interface GaitAnalysisResult {
-  accelerationChange: number;
-  angularTilt: number;
+interface BalanceAnalysisResult {
+  shakeIntensity: number;
+  stabilityScore: number;
   overallScore: number;
   isAbnormal: boolean;
 }
@@ -26,15 +26,13 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
   const [countdown, setCountdown] = useState(0);
   const [testProgress, setTestProgress] = useState(0);
   const [accelerometerData, setAccelerometerData] = useState<MotionData[]>([]);
-  const [gyroscopeData, setGyroscopeData] = useState<MotionData[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [testResult, setTestResult] = useState<GaitAnalysisResult | null>(null);
+  const [testResult, setTestResult] = useState<BalanceAnalysisResult | null>(null);
   const [showEmergency, setShowEmergency] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const accelListenerRef = useRef<any>(null);
-  const gyroListenerRef = useRef<any>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -44,7 +42,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         setCountdown(prev => prev - 1);
       }, 1000);
     } else if (countdown === 0 && isTestActive) {
-      startGaitTracking();
+      startBalanceTracking();
     }
 
     return () => {
@@ -65,10 +63,6 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         await accelListenerRef.current.remove();
         accelListenerRef.current = null;
       }
-      if (gyroListenerRef.current) {
-        await gyroListenerRef.current.remove();
-        gyroListenerRef.current = null;
-      }
     } catch (error) {
       console.error('Error stopping motion listeners:', error);
     }
@@ -79,21 +73,19 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
     setCountdown(5);
     setTestProgress(0);
     setAccelerometerData([]);
-    setGyroscopeData([]);
     setShowResults(false);
     setShowEmergency(false);
     setTestResult(null);
     
     toast({
-      title: "Gait Balance Test Starting",
-      description: "Prepare to walk normally with phone held against chest",
+      title: "Balance Stability Test Starting",
+      description: "Prepare to hold phone against chest and stay still",
     });
   };
 
-  const startGaitTracking = async () => {
+  const startBalanceTracking = async () => {
     try {
       setAccelerometerData([]);
-      setGyroscopeData([]);
 
       console.log('Starting motion tracking...');
 
@@ -109,21 +101,9 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         setAccelerometerData(prev => [...prev, data]);
       });
 
-      // Start gyroscope
-      gyroListenerRef.current = await Motion.addListener('orientation', (event) => {
-        const data: MotionData = {
-          x: event.alpha || 0,
-          y: event.beta || 0,
-          z: event.gamma || 0,
-          timestamp: Date.now()
-        };
-        console.log('Gyro data:', data);
-        setGyroscopeData(prev => [...prev, data]);
-      });
-
       toast({
-        title: "Start Walking",
-        description: "Walk naturally for 15 seconds with phone against your chest",
+        title: "Stay Still",
+        description: "Hold the phone against your chest and stay as still as possible for 15 seconds",
       });
 
       // Run test for 15 seconds
@@ -137,7 +117,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         
         if (elapsed >= testDuration) {
           clearInterval(progressInterval);
-          stopGaitTest();
+          stopBalanceTest();
         }
       }, 100);
 
@@ -166,40 +146,31 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       
       // Generate realistic motion data
       const accelData: MotionData = {
-        x: (Math.random() - 0.5) * 4 + Math.sin(elapsed / 500) * 2,
-        y: (Math.random() - 0.5) * 4 + Math.cos(elapsed / 600) * 1.5,
-        z: 9.8 + (Math.random() - 0.5) * 3,
-        timestamp: Date.now()
-      };
-      
-      const gyroData: MotionData = {
-        x: (Math.random() - 0.5) * 0.3,
-        y: (Math.random() - 0.5) * 0.3,
-        z: (Math.random() - 0.5) * 0.2,
+        x: (Math.random() - 0.5) * 0.4,
+        y: (Math.random() - 0.5) * 0.4,
+        z: 9.8 + (Math.random() - 0.5) * 0.3,
         timestamp: Date.now()
       };
       
       setAccelerometerData(prev => [...prev, accelData]);
-      setGyroscopeData(prev => [...prev, gyroData]);
       
       if (elapsed >= testDuration) {
         clearInterval(simulationInterval);
-        stopGaitTest();
+        stopBalanceTest();
       }
     }, 50);
   };
 
-  const stopGaitTest = async () => {
-    console.log('Stopping gait test...');
+  const stopBalanceTest = async () => {
+    console.log('Stopping balance test...');
     try {
       await stopMotionListeners();
       setIsAnalyzing(true);
       
       console.log('Accel data points:', accelerometerData.length);
-      console.log('Gyro data points:', gyroscopeData.length);
       
-      // Analyze the gait data
-      const result = analyzeGaitPattern(accelerometerData, gyroscopeData);
+      // Analyze the balance data
+      const result = analyzeBalanceStability(accelerometerData);
       setTestResult(result);
       
       console.log('Analysis result:', result);
@@ -207,15 +178,15 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       if (result.isAbnormal) {
         setShowEmergency(true);
         toast({
-          title: "Abnormal Gait Detected",
+          title: "Abnormal Balance Detected",
           description: "Emergency assistance activated",
           variant: "destructive",
         });
       } else {
         setShowResults(true);
         toast({
-          title: "Gait Analysis Complete",
-          description: "Normal walking pattern detected",
+          title: "Balance Analysis Complete",
+          description: "Normal balance stability detected",
         });
       }
 
@@ -226,244 +197,393 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
         onComplete({
           stroke_detected: result.isAbnormal,
           abnormality_detected: result.isAbnormal,
-          gait_analysis: result
+          balance_analysis: result
         });
       }
 
     } catch (error) {
-      console.error('Failed to stop gait tracking:', error);
+      console.error('Failed to stop balance tracking:', error);
       setIsAnalyzing(false);
     }
   };
 
-  const analyzeGaitPattern = (accelData: MotionData[], gyroData: MotionData[]): GaitAnalysisResult => {
+  const analyzeBalanceStability = (accelData: MotionData[]): BalanceAnalysisResult => {
     if (accelData.length < 10) {
       console.log('Insufficient acceleration data');
       return { 
-        accelerationChange: 0, 
-        angularTilt: 0, 
+        shakeIntensity: 0, 
+        stabilityScore: 0, 
         overallScore: 0, 
         isAbnormal: true 
       };
     }
 
-    // Calculate acceleration change using the research formula
-    let totalAccelChange = 0;
+    // Calculate shake intensity
+    let totalShake = 0;
     for (let i = 1; i < accelData.length; i++) {
       const dx = accelData[i].x - accelData[i-1].x;
       const dy = accelData[i].y - accelData[i-1].y;
-      const change = Math.sqrt(dx * dx + dy * dy);
-      totalAccelChange += change;
+      const dz = accelData[i].z - accelData[i-1].z;
+      const shake = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      totalShake += shake;
     }
-    const accelerationChange = totalAccelChange / (accelData.length - 1);
+    const shakeIntensity = totalShake / (accelData.length - 1);
 
-    // Calculate angular tilt using the research formula
-    let totalAngularTilt = 0;
-    if (gyroData.length > 0) {
-      const samplingRate = 50; // 50 Hz
-      for (const gyroPoint of gyroData) {
-        const ax = Math.abs(gyroPoint.x) / samplingRate * (180 / Math.PI);
-        const ay = Math.abs(gyroPoint.y) / samplingRate * (180 / Math.PI);
-        const az = Math.abs(gyroPoint.z) / samplingRate * (180 / Math.PI);
-        totalAngularTilt += ax + ay + az;
-      }
+    // Calculate stability score
+    let stabilitySum = 0;
+    for (const dataPoint of accelData) {
+      const deviation = Math.abs(dataPoint.z - 9.8);
+      stabilitySum += deviation;
     }
-    const angularTilt = totalAngularTilt;
+    const stabilityScore = stabilitySum / accelData.length;
 
     // Calculate overall score
-    const overallScore = accelerationChange * 0.6 + angularTilt * 0.4;
+    const overallScore = shakeIntensity * 0.7 + stabilityScore * 0.3;
 
     console.log('Analysis:', {
-      accelerationChange,
-      angularTilt,
+      shakeIntensity,
+      stabilityScore,
       overallScore,
-      accelDataLength: accelData.length,
-      gyroDataLength: gyroData.length
+      accelDataLength: accelData.length
     });
 
-    // Determine if abnormal (adjusted thresholds for walking test)
-    const isAbnormal = accelerationChange > 3.0 || angularTilt > 15.0 || overallScore > 12.0;
+    // Determine if abnormal (adjusted thresholds for balance test)
+    const isAbnormal = shakeIntensity > 0.6 || stabilityScore > 0.4 || overallScore > 0.5;
 
     return {
-      accelerationChange,
-      angularTilt,
+      shakeIntensity,
+      stabilityScore,
       overallScore,
       isAbnormal
     };
-  };
-
-  const callEmergencyServices = () => {
-    window.open('tel:911');
-    toast({
-      title: "Emergency Call",
-      description: "Calling emergency services...",
-      variant: "destructive",
-    });
   };
 
   const goToEmergencyPage = () => {
     navigate('/emergency');
   };
 
+  const cardVariants = {
+    hidden: { scale: 0.9, opacity: 0 },
+    visible: {
+      scale: 1,
+      opacity: 1,
+      transition: { duration: 0.5, ease: "easeOut" }
+    }
+  };
+
+  const pulseVariants = {
+    animate: {
+      scale: [1, 1.05, 1],
+      transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+    }
+  };
+
   if (showEmergency) {
     return (
-      <div className="p-4 max-w-md mx-auto">
-        <Card className="border-red-200 bg-red-50">
-          <CardHeader className="text-center">
-            <AlertTriangle className="h-16 w-16 text-red-600 mx-auto mb-4" />
-            <CardTitle className="text-red-800 text-2xl">Abnormal Gait Detected</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-red-700 text-center mb-6">
-              Your walking pattern shows irregularities that may indicate balance issues. 
-              Please seek immediate medical attention.
-            </p>
-            
-            <Button 
-              onClick={callEmergencyServices}
-              variant="destructive" 
-              size="lg" 
-              className="w-full text-lg py-4"
-            >
-              <Phone className="h-6 w-6 mr-2" />
-              Call 911 Emergency Services
-            </Button>
-            
-            <Button 
-              onClick={goToEmergencyPage}
-              variant="outline" 
-              className="w-full border-red-300 text-red-700"
-            >
-              <AlertTriangle className="h-5 w-5 mr-2" />
-              Emergency Assistance Page
-            </Button>
-            
-            {testResult && (
-              <div className="bg-red-100 p-4 rounded-lg mt-4">
-                <h4 className="font-semibold text-red-800 mb-2">Test Results:</h4>
-                <div className="text-sm text-red-700 space-y-1">
-                  <p>Acceleration Change: {testResult.accelerationChange.toFixed(2)}</p>
-                  <p>Angular Tilt: {testResult.angularTilt.toFixed(2)}</p>
-                  <p>Overall Score: {testResult.overallScore.toFixed(2)}</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <motion.div 
+        className="p-4 max-w-md mx-auto"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <motion.div
+          animate={{ 
+            boxShadow: [
+              "0 0 0 0 rgba(239, 68, 68, 0.7)",
+              "0 0 0 20px rgba(239, 68, 68, 0)",
+              "0 0 0 0 rgba(239, 68, 68, 0)"
+            ]
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <Card className="border-red-200 bg-red-50">
+            <CardHeader className="text-center">
+              <motion.div
+                animate={{ 
+                  rotate: [0, 10, -10, 0],
+                  scale: [1, 1.1, 1]
+                }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                <AlertTriangle className="h-16 w-16 text-red-600 mx-auto mb-4" />
+              </motion.div>
+              <CardTitle className="text-red-800 text-2xl">Abnormal Balance Detected</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <motion.p 
+                className="text-red-700 text-center mb-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+              >
+                Excessive shaking detected while holding the phone. This may indicate balance issues. 
+                Please seek immediate medical attention.
+              </motion.p>
+              
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
+              >
+                <Button 
+                  onClick={() => window.open('tel:911')}
+                  variant="destructive" 
+                  size="lg" 
+                  className="w-full text-lg py-4 shadow-lg"
+                >
+                  <Phone className="h-6 w-6 mr-2" />
+                  Call 911 Emergency Services
+                </Button>
+              </motion.div>
+              
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 0.5 }}
+              >
+                <Button 
+                  onClick={goToEmergencyPage}
+                  variant="outline" 
+                  className="w-full border-red-300 text-red-700"
+                >
+                  <AlertTriangle className="h-5 w-5 mr-2" />
+                  Emergency Assistance Page
+                </Button>
+              </motion.div>
+              
+              {testResult && (
+                <motion.div 
+                  className="bg-red-100 p-4 rounded-lg mt-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.9, duration: 0.5 }}
+                >
+                  <h4 className="font-semibold text-red-800 mb-2">Test Results:</h4>
+                  <div className="text-sm text-red-700 space-y-1">
+                    <p>Shake Intensity: {testResult.shakeIntensity.toFixed(2)}</p>
+                    <p>Stability Score: {testResult.stabilityScore.toFixed(2)}</p>
+                    <p>Overall Score: {testResult.overallScore.toFixed(2)}</p>
+                  </div>
+                </motion.div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <Card>
+    <motion.div 
+      className="p-4 max-w-md mx-auto"
+      variants={cardVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-center text-blue-800 flex items-center justify-center">
-            <Activity className="h-6 w-6 mr-2" />
-            Quick Gait Balance Test
+            <motion.div
+              animate={{ y: [0, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="mr-2"
+            >
+              <Activity className="h-6 w-6" />
+            </motion.div>
+            Balance Stability Test
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {!isTestActive && !showResults && (
-            <div className="text-center space-y-4">
+            <motion.div 
+              className="text-center space-y-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
               <p className="text-gray-600">
-                This test analyzes your walking pattern to detect balance abnormalities. 
-                Simply hold your phone against your chest and walk naturally for 15 seconds.
+                This test detects balance issues by monitoring phone stability. 
+                Hold your phone firmly against your chest and try to stay as still as possible for 15 seconds.
               </p>
-              <div className="bg-blue-50 p-4 rounded-lg">
+              <motion.div 
+                className="bg-blue-50 p-4 rounded-lg"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
+              >
                 <h4 className="font-semibold text-blue-800 mb-2">Instructions:</h4>
                 <ol className="text-sm text-blue-700 space-y-2 text-left">
                   <li>1. Hold phone firmly against your chest</li>
-                  <li>2. Walk at your normal pace</li>
-                  <li>3. Walk in a straight line if possible</li>
-                  <li>4. Keep the phone steady against your body</li>
+                  <li>2. Stand still and maintain balance</li>
+                  <li>3. Try to minimize any shaking or movement</li>
+                  <li>4. Keep the phone steady for the entire test</li>
                 </ol>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           )}
 
           {countdown > 0 && (
-            <div className="text-center">
-              <div className="text-6xl font-bold text-blue-600 mb-2">{countdown}</div>
-              <p className="text-gray-600">Get ready to walk...</p>
-              <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
+            <motion.div 
+              className="text-center"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            >
+              <motion.div 
+                className="text-6xl font-bold text-blue-600 mb-2"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 1, ease: "easeInOut" }}
+              >
+                {countdown}
+              </motion.div>
+              <p className="text-gray-600">Get ready...</p>
+              <motion.div 
+                className="mt-4 p-4 bg-yellow-50 rounded-lg"
+                animate={{ backgroundColor: ["#fefce8", "#fef3c7", "#fefce8"] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
                 <p className="text-sm text-yellow-700">
-                  Position your phone against your chest and prepare to walk naturally
+                  Position your phone against your chest and prepare to stay very still
                 </p>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           )}
 
           {isTestActive && countdown === 0 && (
-            <div className="text-center space-y-4">
-              <div className="text-2xl font-bold text-green-600">
-                Walking Test Active
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-4">
-                <div 
-                  className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+            <motion.div 
+              className="text-center space-y-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+            >
+              <motion.div 
+                className="text-2xl font-bold text-green-600"
+                variants={pulseVariants}
+                animate="animate"
+              >
+                Stay Very Still
+              </motion.div>
+              <motion.div 
+                className="w-full bg-gray-200 rounded-full h-4 overflow-hidden"
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 0.5 }}
+              >
+                <motion.div 
+                  className="bg-gradient-to-r from-blue-600 to-green-600 h-4 rounded-full"
                   style={{ width: `${testProgress}%` }}
-                ></div>
-              </div>
+                  transition={{ duration: 0.3 }}
+                />
+              </motion.div>
               <p className="text-sm text-gray-600">
-                Keep walking naturally: {Math.round(15 - (testProgress * 0.15))}s remaining
+                Keep phone steady: {Math.round(15 - (testProgress * 0.15))}s remaining
               </p>
-              <div className="bg-green-50 p-4 rounded-lg">
+              <motion.div 
+                className="bg-green-50 p-4 rounded-lg"
+                animate={{ backgroundColor: ["#f0fdf4", "#dcfce7", "#f0fdf4"] }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
                 <p className="text-sm text-green-700">
-                  📱 Keep phone against chest<br/>
-                  👟 Walk at normal pace<br/>
-                  ➡️ Walk in straight line
+                  📱 Hold phone against chest<br/>
+                  🧘 Stay very still<br/>
+                  ⚖️ Maintain balance
                 </p>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           )}
 
           {isAnalyzing && (
-            <div className="text-center space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-gray-600">Analyzing gait pattern...</p>
-              <p className="text-sm text-gray-500">Processing sensor data...</p>
-            </div>
+            <motion.div 
+              className="text-center space-y-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="mx-auto w-8 h-8"
+              >
+                <div className="rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </motion.div>
+              <p className="text-gray-600">Analyzing balance stability...</p>
+              <motion.p 
+                className="text-sm text-gray-500"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                Processing movement data...
+              </motion.p>
+            </motion.div>
           )}
 
           {showResults && testResult && (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-center text-green-800">✅ Normal Gait Pattern</h3>
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <motion.div 
+              className="space-y-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <motion.h3 
+                className="font-semibold text-center text-green-800"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
+              >
+                ✅ Normal Balance Detected
+              </motion.h3>
+              <motion.div 
+                className="bg-green-50 p-4 rounded-lg border border-green-200"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
+              >
                 <h4 className="font-semibold text-green-800 mb-2">Test Results:</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Acceleration Change:</span>
-                    <span className="font-medium">{testResult.accelerationChange.toFixed(2)}</span>
+                    <span>Shake Intensity:</span>
+                    <span className="font-medium">{testResult.shakeIntensity.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Angular Tilt:</span>
-                    <span className="font-medium">{testResult.angularTilt.toFixed(2)}</span>
+                    <span>Stability Score:</span>
+                    <span className="font-medium">{testResult.stabilityScore.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-semibold">Overall Score:</span>
                     <span className="font-bold text-green-600">{testResult.overallScore.toFixed(2)}</span>
                   </div>
                 </div>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
+              </motion.div>
+              <motion.div 
+                className="bg-gray-50 p-4 rounded-lg"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+              >
                 <p className="text-sm text-gray-700">
-                  Your walking pattern appears normal with no significant balance abnormalities detected.
+                  Your balance stability appears normal with no significant abnormalities detected.
                 </p>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           )}
 
-          <Button 
-            onClick={startTest}
-            disabled={isTestActive || isAnalyzing}
-            className="w-full"
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            {isTestActive ? 'Test in Progress...' : showResults ? 'Restart Test' : 'Start Gait Test'}
-          </Button>
+            <Button 
+              onClick={startTest}
+              disabled={isTestActive || isAnalyzing}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
+            >
+              {isTestActive ? 'Test in Progress...' : showResults ? 'Restart Test' : 'Start Balance Test'}
+            </Button>
+          </motion.div>
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   );
 };
 

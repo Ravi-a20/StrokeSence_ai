@@ -11,6 +11,7 @@ import { UserLogin } from '../services/apiService';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Code } from 'lucide-react';
 import DevLoginForm from '../components/DevLoginForm';
+import { motion } from 'framer-motion';
 
 const Login = () => {
   const [formData, setFormData] = useState<UserLogin>({
@@ -67,77 +68,166 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Brain className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <CardTitle className="text-2xl font-bold text-blue-800">
-            Welcome Back to Stroke Sense
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your email"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your password"
-              />
-            </div>
-
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={isLoading}
+    <motion.div 
+      className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.8 }}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 50, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <Card className="w-full max-w-md shadow-2xl">
+          <motion.div
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <CardHeader className="text-center">
+              <motion.div
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                className="mx-auto mb-4"
+              >
+                <Brain className="h-12 w-12 text-blue-600" />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+              >
+                <CardTitle className="text-2xl font-bold text-blue-800">
+                  Welcome Back to Stroke Sense
+                </CardTitle>
+              </motion.div>
+            </CardHeader>
+          </motion.div>
+          
+          <CardContent>
+            <motion.form 
+              onSubmit={handleSubmit} 
+              className="space-y-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
             >
-              {isLoading ? 'Logging in...' : 'Login'}
-            </Button>
-
-            <div className="text-center text-sm">
-              <span className="text-gray-600">Don't have an account? </span>
-              <Button
-                type="button"
-                variant="link"
-                className="p-0 h-auto"
-                onClick={() => navigate('/register')}
+              <motion.div
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.4 }}
               >
-                Register here
-              </Button>
-            </div>
-
-            <div className="border-t pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full text-purple-600 border-purple-300 hover:bg-purple-50"
-                onClick={() => setShowDevMode(true)}
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Enter your email"
+                  className="transition-all duration-300 focus:scale-105"
+                />
+              </motion.div>
+              
+              <motion.div
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
               >
-                <Code className="h-4 w-4 mr-2" />
-                Developer Mode
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Enter your password"
+                  className="transition-all duration-300 focus:scale-105"
+                />
+              </motion.div>
+
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Button 
+                  type="submit" 
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="mr-2"
+                    >
+                      <Brain className="h-4 w-4" />
+                    </motion.div>
+                  ) : null}
+                  {isLoading ? 'Logging in...' : 'Login'}
+                </Button>
+              </motion.div>
+
+              <motion.div 
+                className="text-center text-sm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.7, duration: 0.4 }}
+              >
+                <span className="text-gray-600">Don't have an account? </span>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="inline-block"
+                >
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="p-0 h-auto text-blue-600 hover:text-blue-700"
+                    onClick={() => navigate('/register')}
+                  >
+                    Register here
+                  </Button>
+                </motion.div>
+              </motion.div>
+
+              <motion.div 
+                className="border-t pt-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8, duration: 0.4 }}
+              >
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-purple-600 border-purple-300 hover:bg-purple-50 transition-all duration-300"
+                    onClick={() => setShowDevMode(true)}
+                  >
+                    <motion.div
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      className="mr-2"
+                    >
+                      <Code className="h-4 w-4" />
+                    </motion.div>
+                    Developer Mode
+                  </Button>
+                </motion.div>
+              </motion.div>
+            </motion.form>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 };
 
