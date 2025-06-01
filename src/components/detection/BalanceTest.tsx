@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,6 +183,11 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
           description: "Emergency assistance activated",
           variant: "destructive",
         });
+        
+        // Redirect to emergency page if abnormal
+        setTimeout(() => {
+          navigate('/emergency');
+        }, 3000);
       } else {
         setShowResults(true);
         toast({
