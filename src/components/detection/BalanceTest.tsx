@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
   const [showResults, setShowResults] = useState(false);
   const [testResult, setTestResult] = useState<BalanceAnalysisResult | null>(null);
   const [showEmergency, setShowEmergency] = useState(false);
+  const [sensorWorking, setSensorWorking] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const accelListenerRef = useRef<any>(null);
@@ -53,7 +55,6 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
 
   useEffect(() => {
     return () => {
-      // Cleanup listeners on unmount
       stopMotionListeners();
     };
   }, []);
@@ -77,6 +78,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
     setShowResults(false);
     setShowEmergency(false);
     setTestResult(null);
+    setSensorWorking(false);
     
     toast({
       title: "Balance Stability Test Starting",
@@ -87,20 +89,55 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
   const startBalanceTracking = async () => {
     try {
       setAccelerometerData([]);
-
       console.log('Starting motion tracking...');
 
-      // Start accelerometer
+      // Start accelerometer with error handling
       accelListenerRef.current = await Motion.addListener('accel', (event) => {
-        const data: MotionData = {
-          x: event.acceleration.x,
-          y: event.acceleration.y,
-          z: event.acceleration.z,
-          timestamp: Date.now()
-        };
-        console.log('Accel data:', data);
-        setAccelerometerData(prev => [...prev, data]);
+        console.log('Raw motion event:', event);
+        
+        // Handle different possible data structures
+        let x = 0, y = 0, z = 0;
+        
+        if (event.acceleration) {
+          x = event.acceleration.x || 0;
+          y = event.acceleration.y || 0;
+          z = event.acceleration.z || 0;
+        } else if (event.accelerationIncludingGravity) {
+          x = event.accelerationIncludingGravity.x || 0;
+          y = event.accelerationIncludingGravity.y || 0;
+          z = event.accelerationIncludingGravity.z || 0;
+        } else {
+          // Fallback to direct properties
+          x = event.x || 0;
+          y = event.y || 0;
+          z = event.z || 0;
+        }
+
+        // Validate sensor data
+        if (x !== null && y !== null && z !== null && 
+            !isNaN(x) && !isNaN(y) && !isNaN(z)) {
+          const data: MotionData = {
+            x: Number(x),
+            y: Number(y),
+            z: Number(z),
+            timestamp: Date.now()
+          };
+          
+          console.log('Valid accel data:', data);
+          setSensorWorking(true);
+          setAccelerometerData(prev => [...prev, data]);
+        } else {
+          console.log('Invalid sensor data received:', { x, y, z });
+        }
       });
+
+      // Check if sensor is working after 2 seconds
+      setTimeout(() => {
+        if (!sensorWorking) {
+          console.log('Sensor not working, falling back to simulation');
+          simulateMotionData();
+        }
+      }, 2000);
 
       toast({
         title: "Stay Still",
@@ -125,12 +162,12 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
     } catch (error) {
       console.error('Failed to start motion tracking:', error);
       toast({
-        title: "Error",
-        description: "Failed to start motion sensors. Using simulated data for demo.",
+        title: "Sensor Error",
+        description: "Motion sensors unavailable. Using simulated data for demo.",
         variant: "destructive",
       });
       
-      // Fallback to simulated data for web testing
+      // Fallback to simulated data
       simulateMotionData();
     }
   };
@@ -145,14 +182,18 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       const progress = Math.min((elapsed / testDuration) * 100, 100);
       setTestProgress(progress);
       
-      // Generate realistic motion data
+      // Generate realistic balance data with some variation
+      const baseShake = 0.1; // Low base shake for normal balance
+      const variation = (Math.random() - 0.5) * 0.3; // Small random variation
+      
       const accelData: MotionData = {
-        x: (Math.random() - 0.5) * 0.4,
-        y: (Math.random() - 0.5) * 0.4,
-        z: 9.8 + (Math.random() - 0.5) * 0.3,
+        x: baseShake + variation,
+        y: baseShake + variation,
+        z: 9.8 + (Math.random() - 0.5) * 0.2, // Gravity with small variation
         timestamp: Date.now()
       };
       
+      console.log('Simulated accel data:', accelData);
       setAccelerometerData(prev => [...prev, accelData]);
       
       if (elapsed >= testDuration) {
@@ -168,44 +209,47 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       await stopMotionListeners();
       setIsAnalyzing(true);
       
-      console.log('Accel data points:', accelerometerData.length);
+      console.log('Final accel data points:', accelerometerData.length);
+      console.log('Sample data:', accelerometerData.slice(0, 5));
       
-      // Analyze the balance data
-      const result = analyzeBalanceStability(accelerometerData);
-      setTestResult(result);
-      
-      console.log('Analysis result:', result);
-      
-      if (result.isAbnormal) {
-        setShowEmergency(true);
-        toast({
-          title: "Abnormal Balance Detected",
-          description: "Emergency assistance activated",
-          variant: "destructive",
-        });
+      // Wait a moment to ensure all data is collected
+      setTimeout(() => {
+        const result = analyzeBalanceStability(accelerometerData);
+        setTestResult(result);
         
-        // Redirect to emergency page if abnormal
-        setTimeout(() => {
-          navigate('/emergency');
-        }, 3000);
-      } else {
-        setShowResults(true);
-        toast({
-          title: "Balance Analysis Complete",
-          description: "Normal balance stability detected",
-        });
-      }
+        console.log('Analysis result:', result);
+        
+        if (result.isAbnormal) {
+          setShowEmergency(true);
+          toast({
+            title: "Abnormal Balance Detected",
+            description: "Emergency assistance activated",
+            variant: "destructive",
+          });
+          
+          // Redirect to emergency page if abnormal
+          setTimeout(() => {
+            navigate('/emergency');
+          }, 3000);
+        } else {
+          setShowResults(true);
+          toast({
+            title: "Balance Analysis Complete",
+            description: "Normal balance stability detected",
+          });
+        }
 
-      setIsAnalyzing(false);
-      setIsTestActive(false);
+        setIsAnalyzing(false);
+        setIsTestActive(false);
 
-      if (onComplete) {
-        onComplete({
-          stroke_detected: result.isAbnormal,
-          abnormality_detected: result.isAbnormal,
-          balance_analysis: result
-        });
-      }
+        if (onComplete) {
+          onComplete({
+            stroke_detected: result.isAbnormal,
+            abnormality_detected: result.isAbnormal,
+            balance_analysis: result
+          });
+        }
+      }, 500);
 
     } catch (error) {
       console.error('Failed to stop balance tracking:', error);
@@ -214,8 +258,10 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
   };
 
   const analyzeBalanceStability = (accelData: MotionData[]): BalanceAnalysisResult => {
+    console.log('Analyzing balance with data points:', accelData.length);
+    
     if (accelData.length < 10) {
-      console.log('Insufficient acceleration data');
+      console.log('Insufficient acceleration data - marking as abnormal');
       return { 
         shakeIntensity: 0, 
         stabilityScore: 0, 
@@ -224,7 +270,7 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
       };
     }
 
-    // Calculate shake intensity
+    // Calculate shake intensity (rate of change in acceleration)
     let totalShake = 0;
     for (let i = 1; i < accelData.length; i++) {
       const dx = accelData[i].x - accelData[i-1].x;
@@ -235,10 +281,12 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
     }
     const shakeIntensity = totalShake / (accelData.length - 1);
 
-    // Calculate stability score
+    // Calculate stability score (deviation from expected gravity)
     let stabilitySum = 0;
+    const expectedZ = 9.8; // Expected gravity
     for (const dataPoint of accelData) {
-      const deviation = Math.abs(dataPoint.z - 9.8);
+      const totalAccel = Math.sqrt(dataPoint.x * dataPoint.x + dataPoint.y * dataPoint.y + dataPoint.z * dataPoint.z);
+      const deviation = Math.abs(totalAccel - expectedZ);
       stabilitySum += deviation;
     }
     const stabilityScore = stabilitySum / accelData.length;
@@ -246,15 +294,15 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
     // Calculate overall score
     const overallScore = shakeIntensity * 0.7 + stabilityScore * 0.3;
 
-    console.log('Analysis:', {
+    console.log('Balance analysis results:', {
       shakeIntensity,
       stabilityScore,
       overallScore,
-      accelDataLength: accelData.length
+      dataPoints: accelData.length
     });
 
-    // Determine if abnormal (adjusted thresholds for balance test)
-    const isAbnormal = shakeIntensity > 0.6 || stabilityScore > 0.4 || overallScore > 0.5;
+    // Determine if abnormal - adjusted thresholds for balance test
+    const isAbnormal = shakeIntensity > 0.8 || stabilityScore > 0.6 || overallScore > 0.7;
 
     return {
       shakeIntensity,
@@ -498,6 +546,11 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
                   ⚖️ Maintain balance
                 </p>
               </motion.div>
+              
+              {/* Sensor status indicator */}
+              <div className="text-xs text-gray-500">
+                Sensor Status: {sensorWorking ? '✅ Active' : '⚠️ Fallback Mode'}
+              </div>
             </motion.div>
           )}
 
@@ -594,3 +647,4 @@ const BalanceTest = ({ onComplete }: { onComplete?: (result: any) => void }) => 
 };
 
 export default BalanceTest;
+
