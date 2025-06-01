@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +40,20 @@ const Dashboard = () => {
       title: "Starting Comprehensive Analysis",
       description: "You will complete balance, eye tracking, and speech tests sequentially.",
     });
+  };
+
+  const handleTestComplete = (result: any) => {
+    // Check if anomaly detected and redirect to emergency
+    if (result.stroke_detected || result.abnormality_detected || result.status === 'anomaly') {
+      toast({
+        title: "Anomaly Detected",
+        description: "Redirecting to emergency assistance...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        navigate('/emergency');
+      }, 2000);
+    }
   };
 
   if (!user) {
@@ -319,7 +332,7 @@ const Dashboard = () => {
           </motion.div>
         </motion.div>
 
-        {/* Quick Information */}
+        {/* Quick Information - Updated to show stroke information instead of FAST */}
         <motion.div variants={itemVariants}>
           <Card>
             <CardHeader className="pb-3">
@@ -335,6 +348,7 @@ const Dashboard = () => {
                 transition={{ duration: 0.2 }}
               >
                 <h4 className="font-medium text-gray-900">Recognizing Stroke Symptoms</h4>
+                <p className="text-sm text-gray-600 mt-1">Learn to identify warning signs of stroke</p>
               </motion.div>
 
               <motion.div 
@@ -345,6 +359,7 @@ const Dashboard = () => {
                 transition={{ duration: 0.2 }}
               >
                 <h4 className="font-medium text-gray-900">First Aid for Stroke</h4>
+                <p className="text-sm text-gray-600 mt-1">Immediate steps to take when stroke is suspected</p>
               </motion.div>
 
               <motion.div 
@@ -355,6 +370,7 @@ const Dashboard = () => {
                 transition={{ duration: 0.2 }}
               >
                 <h4 className="font-medium text-gray-900">Stroke Prevention</h4>
+                <p className="text-sm text-gray-600 mt-1">Lifestyle changes and risk reduction strategies</p>
               </motion.div>
             </CardContent>
           </Card>
