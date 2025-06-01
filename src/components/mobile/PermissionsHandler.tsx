@@ -20,56 +20,85 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
   });
   const [isChecking, setIsChecking] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     checkInitialPermissions();
   }, []);
 
   const checkInitialPermissions = async () => {
-    // Only show permissions screen on native platforms
-    if (!Capacitor.isNativePlatform()) {
-      onPermissionsGranted();
-      return;
-    }
+    try {
+      // Only show permissions screen on native platforms
+      if (!Capacitor.isNativePlatform()) {
+        console.log('Web platform detected, skipping permissions');
+        onPermissionsGranted();
+        return;
+      }
 
-    const currentPermissions = await permissionsService.checkPermissions();
-    setPermissions(currentPermissions);
-    
-    // If all permissions are granted, proceed
-    if (currentPermissions.camera && currentPermissions.microphone && currentPermissions.storage && currentPermissions.motion) {
-      onPermissionsGranted();
-    } else {
-      setShowPermissions(true);
+      console.log('Native platform detected, checking permissions');
+      const currentPermissions = await permissionsService.checkPermissions();
+      setPermissions(currentPermissions);
+      
+      // If all critical permissions are granted, proceed
+      if (currentPermissions.camera && currentPermissions.microphone) {
+        console.log('Critical permissions already granted, proceeding');
+        onPermissionsGranted();
+      } else {
+        console.log('Permissions needed, showing permissions screen');
+        setShowPermissions(true);
+      }
+    } catch (error) {
+      console.error('Error checking initial permissions:', error);
+      setError('Failed to check permissions. Continuing anyway...');
+      // Continue to app even if permission check fails
+      setTimeout(() => {
+        onPermissionsGranted();
+      }, 2000);
     }
   };
 
   const requestPermissions = async () => {
     setIsChecking(true);
+    setError(null);
+    
     try {
+      console.log('Requesting permissions...');
       const newPermissions = await permissionsService.requestAllPermissions();
       setPermissions(newPermissions);
       
-      // Check if all critical permissions are granted
-      if (newPermissions.camera && newPermissions.microphone) {
+      // Check if critical permissions are granted (camera and microphone are most important)
+      if (newPermissions.camera || newPermissions.microphone) {
+        console.log('At least one critical permission granted, proceeding');
         onPermissionsGranted();
+      } else {
+        setError('Some permissions were denied. You can still use the app with limited functionality.');
       }
     } catch (error) {
       console.error('Permission request failed:', error);
+      setError('Permission request failed. You can still continue to use the app.');
     } finally {
       setIsChecking(false);
     }
   };
 
   const skipPermissions = () => {
-    // Allow user to continue without all permissions
+    console.log('User chose to skip permissions');
     onPermissionsGranted();
   };
 
-  if (!showPermissions) {
+  // Auto-continue if there's an error after 3 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        onPermissionsGranted();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, onPermissionsGranted]);
+
+  if (!showPermissions && !error) {
     return null;
   }
-
-  const allPermissionsGranted = permissions.camera && permissions.microphone && permissions.storage && permissions.motion;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
@@ -77,10 +106,19 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
         <CardHeader className="text-center">
           <CardTitle className="text-2xl text-blue-600">App Permissions</CardTitle>
           <p className="text-gray-600">
-            Stroke Sense needs these permissions to work properly
+            Stroke Sense works best with these permissions
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
+          {error && (
+            <Alert className="border-orange-200 bg-orange-50">
+              <Settings className="h-4 w-4" />
+              <AlertDescription className="text-orange-800">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center space-x-3">
@@ -143,15 +181,6 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
             </div>
           </div>
 
-          {!allPermissionsGranted && (
-            <Alert>
-              <Settings className="h-4 w-4" />
-              <AlertDescription>
-                If permissions were denied, you may need to enable them manually in your device settings.
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="space-y-3">
             <Button 
               onClick={requestPermissions}
@@ -166,7 +195,7 @@ const PermissionsHandler: React.FC<PermissionsHandlerProps> = ({ onPermissionsGr
               variant="outline"
               className="w-full"
             >
-              Continue Without All Permissions
+              Continue to App
             </Button>
           </div>
         </CardContent>
