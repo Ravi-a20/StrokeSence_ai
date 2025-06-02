@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Stroke Sense</string>
+    <string name="title_activity_main">Stroke Sense</string>
+    <string name="package_name">app.lovable.f85da54ec88748fb8806c807b4e13848</string>
+    <string name="custom_url_scheme">app.lovable.f85da54ec88748fb8806c807b4e13848</string>
+</resources>

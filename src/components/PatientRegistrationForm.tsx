@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiService, UserCreate, EmergencyContact } from '../services/apiService';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Plus, Trash2, Upload, Calendar } from 'lucide-react';
+import { Brain, Plus, Trash2 } from 'lucide-react';
 
 const PatientRegistrationForm = () => {
   const [formData, setFormData] = useState<UserCreate>({
@@ -17,7 +16,9 @@ const PatientRegistrationForm = () => {
     role: 'patient',
     emergency_contacts: [{ name: '', relation: '', phone: '' }]
   });
-  
+
+  // Commented out patientData and related state
+  /*
   const [patientData, setPatientData] = useState({
     photo: null as File | null,
     voice_sample: null as File | null,
@@ -25,7 +26,8 @@ const PatientRegistrationForm = () => {
     weight_kg: '',
     medical_history: [{ condition: '', diagnosed_at: '', notes: '' }]
   });
-  
+  */
+
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -39,6 +41,8 @@ const PatientRegistrationForm = () => {
     }));
   };
 
+  // Commented out patient data handlers
+  /*
   const handlePatientDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setPatientData(prev => ({
@@ -56,6 +60,7 @@ const PatientRegistrationForm = () => {
       }));
     }
   };
+  */
 
   const addEmergencyContact = () => {
     setFormData(prev => ({
@@ -82,6 +87,8 @@ const PatientRegistrationForm = () => {
     }));
   };
 
+  // Commented out medical history handlers
+  /*
   const addMedicalHistory = () => {
     setPatientData(prev => ({
       ...prev,
@@ -106,10 +113,11 @@ const PatientRegistrationForm = () => {
       )
     }));
   };
+  */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== confirmPassword) {
       toast({
         title: "Error",
@@ -119,6 +127,8 @@ const PatientRegistrationForm = () => {
       return;
     }
 
+    // Commented out patientData checks
+    /*
     if (!patientData.photo || !patientData.voice_sample) {
       toast({
         title: "Error",
@@ -127,13 +137,13 @@ const PatientRegistrationForm = () => {
       });
       return;
     }
+    */
 
     setIsLoading(true);
     try {
-      // First create the user
+      // Only create the user with basic info
       await apiService.createUser(formData);
-      
-      // Then create patient profile (this would need authentication)
+
       toast({
         title: "Success",
         description: "Account created successfully! Please log in to complete your profile.",
@@ -220,7 +230,8 @@ const PatientRegistrationForm = () => {
               </div>
             </div>
 
-            {/* Physical Information */}
+            {/* Commented out Physical Information */}
+            {/*
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Physical Information</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -251,8 +262,10 @@ const PatientRegistrationForm = () => {
                 </div>
               </div>
             </div>
+            */}
 
-            {/* File Uploads */}
+            {/* Commented out File Uploads */}
+            {/*
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Required Uploads</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -283,8 +296,10 @@ const PatientRegistrationForm = () => {
                 </div>
               </div>
             </div>
+            */}
 
-            {/* Medical History */}
+            {/* Commented out Medical History */}
+            {/*
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Medical History</h3>
@@ -323,6 +338,7 @@ const PatientRegistrationForm = () => {
                 </div>
               ))}
             </div>
+            */}
 
             {/* Emergency Contacts */}
             <div>

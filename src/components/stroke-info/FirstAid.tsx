@@ -108,7 +108,7 @@ const FirstAid: React.FC<FirstAidProps> = ({ onClose }) => {
                   </li>
                   <li className="flex items-start">
                     <span className="w-2 h-2 bg-red-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                    Don't give aspirin unless directed by 911 operator
+                    Don't give aspirin unless directed by 108 operator
                   </li>
                 </ul>
               </div>

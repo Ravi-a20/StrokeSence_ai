@@ -1,5 +1,5 @@
 
-const BASE_URL = 'http://localhost:8000'; // You can change this to your backend URL
+const BASE_URL = 'https://strokesence.onrender.com'; // You can change this to your backend URL
 
 export interface UserCreate {
   name: string;
@@ -94,7 +94,7 @@ class ApiService {
   }
 
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('access_token');
     return {
       'Content-Type': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` })
@@ -217,6 +217,7 @@ class ApiService {
     }
 
     return response.json();
+    
   }
 
   async getDetectionHistory(): Promise<Detection[]> {
