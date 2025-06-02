@@ -7,11 +7,7 @@ import { apiService } from '../../services/apiService';
 import { authService } from '../../services/authService';
 import { Mic, MicOff, Play, Square } from 'lucide-react';
 
-interface SpeechTestProps {
-  onComplete?: (result: any) => void;
-}
-
-const SpeechTest: React.FC<SpeechTestProps> = ({ onComplete }) => {
+const SpeechTest = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [hasRecording, setHasRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -121,34 +117,12 @@ const SpeechTest: React.FC<SpeechTestProps> = ({ onComplete }) => {
           description: "Speech abnormalities detected",
           variant: "destructive",
         });
-        
-        // Call onComplete with anomaly result
-        if (onComplete) {
-          onComplete({
-            stroke_detected: true,
-            abnormality_detected: true,
-            status: 'anomaly',
-            confidence_score: 0.8,
-            result: 'stroke_detected'
-          });
-        }
       } else {
         setTestResult('No significant speech abnormalities detected.');
         toast({
           title: "Test Result",
           description: "Speech appears normal",
         });
-        
-        // Call onComplete with normal result
-        if (onComplete) {
-          onComplete({
-            stroke_detected: false,
-            abnormality_detected: false,
-            status: 'normal',
-            confidence_score: 0.2,
-            result: 'normal'
-          });
-        }
       }
     } catch (error) {
       console.error('Speech analysis failed:', error);
@@ -158,18 +132,6 @@ const SpeechTest: React.FC<SpeechTestProps> = ({ onComplete }) => {
         description: "Failed to analyze speech data",
         variant: "destructive",
       });
-      
-      // For demo purposes, randomly return result
-      const randomResult = Math.random() > 0.7;
-      if (onComplete) {
-        onComplete({
-          stroke_detected: randomResult,
-          abnormality_detected: randomResult,
-          status: randomResult ? 'anomaly' : 'normal',
-          confidence_score: randomResult ? 0.8 : 0.2,
-          result: randomResult ? 'stroke_detected' : 'normal'
-        });
-      }
     } finally {
       setIsAnalyzing(false);
     }

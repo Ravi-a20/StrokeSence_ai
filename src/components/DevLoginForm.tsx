@@ -86,7 +86,7 @@ const DevLoginForm: React.FC<DevLoginFormProps> = ({ onDevLogin, onBackToNormal 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="••••••"
+                  placeholder="dev123"
                 />
                 <Button
                   type="button"

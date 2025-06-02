@@ -3,7 +3,7 @@ import { Camera } from '@capacitor/camera';
 import { Filesystem } from '@capacitor/filesystem';
 import { Motion } from '@capacitor/motion';
 import { Capacitor } from '@capacitor/core';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 export interface PermissionStatus {
   camera: boolean;
@@ -60,7 +60,6 @@ class PermissionsService {
       }
     } catch (error) {
       console.log('Motion permission request failed:', error);
-      permissions.motion = true; // Assume available
     }
 
     return permissions;
@@ -80,18 +79,10 @@ class PermissionsService {
       permissions.camera = cameraPermission.camera === 'granted';
     } catch (error) {
       console.log('Camera permission request failed:', error);
-      // Try web fallback
-      try {
-        const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        permissions.camera = true;
-        cameraStream.getTracks().forEach(track => track.stop());
-      } catch (webError) {
-        console.log('Web camera fallback failed:', webError);
-      }
     }
 
     try {
-      // For microphone on native platforms, use web API as fallback
+      // For microphone on native platforms, we'll use getUserMedia as fallback
       const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       permissions.microphone = true;
       micStream.getTracks().forEach(track => track.stop());
@@ -105,15 +96,14 @@ class PermissionsService {
       permissions.storage = storagePermission.publicStorage === 'granted';
     } catch (error) {
       console.log('Storage permission request failed:', error);
-      permissions.storage = true; // Assume available for basic functionality
     }
 
     try {
       // Motion permissions are typically granted automatically on native platforms
+      // We just check if the Motion plugin is available
       permissions.motion = true;
     } catch (error) {
       console.log('Motion permission check failed:', error);
-      permissions.motion = true; // Assume available
     }
 
     return permissions;
@@ -128,7 +118,7 @@ class PermissionsService {
   }
 
   private async checkWebPermissions(): Promise<PermissionStatus> {
-    // For web, assume permissions are available (they'll be requested when needed)
+    // For web, we'll check if permissions are available
     return {
       camera: true,
       microphone: true,
@@ -150,15 +140,13 @@ class PermissionsService {
       permissions.camera = cameraPermission.camera === 'granted';
     } catch (error) {
       console.log('Camera permission check failed:', error);
-      permissions.camera = false;
     }
 
     try {
-      // For microphone checking on native, assume granted for now
-      permissions.microphone = true;
+      // For microphone checking on native, we'll use a basic approach
+      permissions.microphone = true; // Assume granted for now
     } catch (error) {
       console.log('Microphone permission check failed:', error);
-      permissions.microphone = false;
     }
 
     try {
@@ -166,7 +154,6 @@ class PermissionsService {
       permissions.storage = storagePermission.publicStorage === 'granted';
     } catch (error) {
       console.log('Storage permission check failed:', error);
-      permissions.storage = true; // Assume available
     }
 
     try {
@@ -174,15 +161,16 @@ class PermissionsService {
       permissions.motion = true;
     } catch (error) {
       console.log('Motion permission check failed:', error);
-      permissions.motion = true;
     }
 
     return permissions;
   }
 
   showPermissionDeniedMessage(permission: string) {
-    toast.error(`${permission} Permission Required`, {
+    toast({
+      title: `${permission} Permission Required`,
       description: `This app needs ${permission} access to function properly. Please enable it in your device settings.`,
+      variant: "destructive",
     });
   }
 }

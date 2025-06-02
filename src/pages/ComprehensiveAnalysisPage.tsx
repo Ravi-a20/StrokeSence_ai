@@ -35,49 +35,31 @@ const ComprehensiveAnalysisPage = () => {
   ];
 
   const handleTestComplete = (testIndex: number, result: any) => {
-    console.log(`Test ${testIndex} completed with result:`, result);
+    const anomalyDetected = result.stroke_detected || result.abnormality_detected || result.status === 'anomaly';
     
-    // Check for anomaly detection based on different result formats
-    const anomalyDetected = result.stroke_detected || 
-                            result.abnormality_detected || 
-                            result.status === 'anomaly' ||
-                            result.result === 'stroke_detected' ||
-                            (result.confidence_score && result.confidence_score > 0.7);
-    
-    // Update test results
-    const updatedResults = [...testResults];
-    updatedResults[testIndex] = { 
-      ...updatedResults[testIndex], 
-      status: anomalyDetected ? 'fail' : 'pass', 
-      anomalyDetected 
-    };
-    setTestResults(updatedResults);
+    setTestResults(prev => prev.map((test, index) => 
+      index === testIndex 
+        ? { ...test, status: anomalyDetected ? 'fail' : 'pass', anomalyDetected }
+        : test
+    ));
 
-    // Count anomalies
-    const newAnomalyCount = updatedResults.filter(test => test.anomalyDetected).length;
-    setAnomalyCount(newAnomalyCount);
-    
-    // If 2 or more tests show anomaly, trigger emergency
-    if (newAnomalyCount >= 2) {
-      setShowEmergency(true);
-      toast({
-        title: "Stroke Detected",
-        description: "Multiple tests indicate potential stroke. Emergency assistance activated.",
-        variant: "destructive",
-      });
-      return;
+    if (anomalyDetected) {
+      const newAnomalyCount = anomalyCount + 1;
+      setAnomalyCount(newAnomalyCount);
+      
+      // If 2 or more tests show anomaly, trigger emergency
+      if (newAnomalyCount >= 2) {
+        setShowEmergency(true);
+        toast({
+          title: "Emergency Alert",
+          description: "Multiple tests indicate potential stroke. Emergency assistance activated.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
-    // Move to next test if current test had anomaly but less than 2 total
-    if (anomalyDetected && newAnomalyCount < 2) {
-      toast({
-        title: "Anomaly Detected",
-        description: `${testComponents[testIndex].name} shows anomaly. Continuing with remaining tests.`,
-        variant: "destructive",
-      });
-    }
-
-    // Move to next test or complete analysis
+    // Move to next test
     if (testIndex < testComponents.length - 1) {
       setCurrentTest(testIndex + 1);
       toast({
@@ -85,21 +67,11 @@ const ComprehensiveAnalysisPage = () => {
         description: `Moving to ${testComponents[testIndex + 1].name}`,
       });
     } else {
-      // All tests complete - check final result
-      if (newAnomalyCount >= 2) {
-        setShowEmergency(true);
-      } else if (newAnomalyCount === 1) {
-        toast({
-          title: "Analysis Complete",
-          description: "One test showed anomaly. Please consult a healthcare professional.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Analysis Complete",
-          description: "All tests completed successfully. No anomalies detected.",
-        });
-      }
+      // All tests complete
+      toast({
+        title: "Analysis Complete",
+        description: "All tests have been completed successfully.",
+      });
     }
   };
 
@@ -130,7 +102,7 @@ const ComprehensiveAnalysisPage = () => {
         <Card className="w-full max-w-md border-red-200 bg-red-50">
           <CardHeader className="text-center">
             <AlertTriangle className="h-16 w-16 text-red-600 mx-auto mb-4" />
-            <CardTitle className="text-red-800 text-2xl">Stroke Detected</CardTitle>
+            <CardTitle className="text-red-800 text-2xl">Emergency Alert</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-red-700 text-center mb-6">
@@ -223,22 +195,6 @@ const ComprehensiveAnalysisPage = () => {
             );
           })}
         </div>
-
-        {/* Anomaly Counter */}
-        {anomalyCount > 0 && (
-          <div className="max-w-2xl mx-auto mb-4">
-            <Card className={`border-2 ${anomalyCount >= 2 ? 'border-red-500 bg-red-50' : 'border-yellow-500 bg-yellow-50'}`}>
-              <CardContent className="p-4 text-center">
-                <p className={`font-semibold ${anomalyCount >= 2 ? 'text-red-700' : 'text-yellow-700'}`}>
-                  {anomalyCount >= 2 
-                    ? `⚠️ ${anomalyCount} Anomalies Detected - Stroke Risk High` 
-                    : `⚠️ ${anomalyCount} Anomaly Detected - Monitoring`
-                  }
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         {/* Current Test */}
         <div className="max-w-2xl mx-auto">
