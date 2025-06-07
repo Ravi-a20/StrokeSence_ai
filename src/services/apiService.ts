@@ -102,7 +102,7 @@ class ApiService {
   }
 
   private getAuthHeadersMultipart(): HeadersInit {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('access_token'); // Fixed: changed from 'authToken' to 'access_token'
     return {
       ...(token && { 'Authorization': `Bearer ${token}` })
     };
@@ -123,9 +123,10 @@ class ApiService {
     }
 
     const result = await response.json();
-    // Store auth token if provided
+    // Store auth token consistently
     if (result.access_token) {
-      localStorage.setItem('authToken', result.access_token);
+      localStorage.setItem('access_token', result.access_token);
+      console.log('Access token stored:', result.access_token);
     }
     return result;
   }
