@@ -33,11 +33,19 @@ export const useMobileBackButton = () => {
     };
 
     // Add the back button listener
-    const backButtonListener = CapacitorApp.addListener('backButton', handleBackButton);
+    let listenerHandle: any;
+    
+    const setupListener = async () => {
+      listenerHandle = await CapacitorApp.addListener('backButton', handleBackButton);
+    };
+    
+    setupListener();
 
     // Cleanup
     return () => {
-      backButtonListener.remove();
+      if (listenerHandle) {
+        listenerHandle.remove();
+      }
     };
   }, [navigate, location.pathname]);
 };
