@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -14,6 +13,9 @@
         android:required="false" />
     <uses-feature
         android:name="android.hardware.sensor.gyroscope"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.telephony"
         android:required="false" />
 
     <!-- Network Permissions -->
@@ -31,13 +33,13 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    
+
     <!-- For Android 13+ (API 33+) storage permissions -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
-    <!-- Phone and Emergency Call Permissions -->
-    <uses-permission android:name="android.permission.CALL_PHONE" />
-    <uses-permission android:name="android.permission.CALL_PRIVILEGED" />
+<!--    &lt;!&ndash; Phone and Emergency Call Permissions &ndash;&gt;-->
+<!--    <uses-permission android:name="android.permission.CALL_PHONE" />-->
+<!--    <uses-permission android:name="android.permission.CALL_PRIVILEGED" />-->
 
     <!-- Device Sensor Permissions -->
     <uses-permission android:name="android.permission.BODY_SENSORS" />
