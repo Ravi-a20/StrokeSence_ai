@@ -1,73 +1,43 @@
-# Welcome to your Lovable project
+# StrokeSense.AI
 
-## Project info
+**StrokeSense.AI** is a smart, cross-platform application designed for early detection of stroke indicators and timely medical assistance. Leveraging AI and real-time sensor data, the platform analyzes balance, eye movement, and speech to identify potential stroke symptoms. If symptoms are detected, the app can automatically alert emergency contacts with the user’s location and relevant details, enabling rapid response and potentially saving lives.
 
-**URL**: https://lovable.dev/projects/f85da54e-c887-48fb-8806-c807b4e13848
+---
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **Balance Test:** Detects abnormal shakes or loss of balance using device motion sensors.
+- **Eye Tracking:** Monitors eye movement for irregularities using the device camera and AI models.
+- **Slurred Speech Detection:** Analyzes speech for slurring using advanced deep learning models.
+- **Emergency Alerts:** Automatically notifies caregivers or emergency services with real-time alerts and geolocation.
+- **User-Friendly Interface:** Seamless experience on both mobile and web platforms.
+- **Secure Authentication:** User registration and login with secure data handling.
+- **Dashboard:** View test results and manage emergency contacts.
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f85da54e-c887-48fb-8806-c807b4e13848) and start prompting.
+## Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Frontend:** React.js, TypeScript, Capacitor
+- **Backend:** FastAPI, Node.js, MongoDB Atlas
+- **Machine Learning:** TensorFlow Lite, Wav2Vec2, MediaPipe, OpenCV
+- **Integrations:** Twilio API for emergency notifications
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## How to Run
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
 
-Follow these steps:
+- Node.js (v14+)
+- npm or yarn
+- Python 3.8+
+- MongoDB Atlas account (or local MongoDB)
+- Twilio account (for SMS/call alerts)
+
+### Frontend
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/f85da54e-c887-48fb-8806-c807b4e13848) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+cd balance-gaze-alert-app
+npm install
+npm start
